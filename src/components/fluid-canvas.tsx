@@ -63,7 +63,6 @@ export const FluidCanvas = ({
     );
     const data = imageData.data;
     const densityArrays = simulation.getDensityArrays();
-    const velocityArrays = simulation.getVelocityArrays();
 
     for (let j = 0; j < canvasHeight; j++) {
       for (let i = 0; i < canvasWidth; i++) {
@@ -192,7 +191,7 @@ export const FluidCanvas = ({
       const y = Math.floor((e.clientY - rect.top) / canvasScale);
       setPrevMousePos({ x, y });
     },
-    [canvasScale],
+    [canvasScale, changeColor],
   );
 
   const handleMouseUp = useCallback(() => {
