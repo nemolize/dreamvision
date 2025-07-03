@@ -134,7 +134,13 @@ export const FluidCanvas = ({
       const amountY = (y - prevY) * 0.5;
 
       if (x >= 0 && x < canvasWidth && y >= 0 && y < canvasHeight) {
-        simulationRef.current.addDensity(x + 1, y + 1, color.r, color.g, color.b);
+        simulationRef.current.addDensity(
+          x + 1,
+          y + 1,
+          color.r,
+          color.g,
+          color.b,
+        );
         simulationRef.current.addVelocity(x + 1, y + 1, amountX, amountY);
 
         for (let i = -1; i <= 1; i++) {
@@ -142,7 +148,13 @@ export const FluidCanvas = ({
             const nx = x + i;
             const ny = y + j;
             if (nx >= 0 && nx < canvasWidth && ny >= 0 && ny < canvasHeight) {
-              simulationRef.current.addDensity(nx + 1, ny + 1, color.r, color.g, color.b);
+              simulationRef.current.addDensity(
+                nx + 1,
+                ny + 1,
+                color.r,
+                color.g,
+                color.b,
+              );
               simulationRef.current.addVelocity(
                 nx + 1,
                 ny + 1,
@@ -156,7 +168,16 @@ export const FluidCanvas = ({
 
       setPrevMousePos({ x, y });
     },
-    [mouseDown, prevMousePos, canvasScale, canvasWidth, canvasHeight, color.r, color.g, color.b],
+    [
+      mouseDown,
+      prevMousePos,
+      canvasScale,
+      canvasWidth,
+      canvasHeight,
+      color.r,
+      color.g,
+      color.b,
+    ],
   );
 
   const handleMouseDown = useCallback(
@@ -217,7 +238,13 @@ export const FluidCanvas = ({
       const amountY = (y - prevY) * 0.8;
 
       if (x >= 0 && x < canvasWidth && y >= 0 && y < canvasHeight) {
-        simulationRef.current.addDensity(x + 1, y + 1, color.r, color.g, color.b);
+        simulationRef.current.addDensity(
+          x + 1,
+          y + 1,
+          color.r,
+          color.g,
+          color.b,
+        );
         simulationRef.current.addVelocity(x + 1, y + 1, amountX, amountY);
 
         for (let dx = -2; dx <= 2; dx++) {
@@ -225,7 +252,13 @@ export const FluidCanvas = ({
             const nx = x + dx;
             const ny = y + dy;
             if (nx >= 0 && nx < canvasWidth && ny >= 0 && ny < canvasHeight) {
-              simulationRef.current.addDensity(nx + 1, ny + 1, color.r, color.g, color.b);
+              simulationRef.current.addDensity(
+                nx + 1,
+                ny + 1,
+                color.r,
+                color.g,
+                color.b,
+              );
               simulationRef.current.addVelocity(
                 nx + 1,
                 ny + 1,
@@ -239,7 +272,16 @@ export const FluidCanvas = ({
 
       setPrevMousePos({ x, y });
     },
-    [touchActive, prevMousePos, canvasScale, canvasWidth, canvasHeight, color.r, color.g, color.b],
+    [
+      touchActive,
+      prevMousePos,
+      canvasScale,
+      canvasWidth,
+      canvasHeight,
+      color.r,
+      color.g,
+      color.b,
+    ],
   );
 
   const handleTouchEnd = useCallback(() => {

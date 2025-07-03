@@ -254,9 +254,21 @@ export class FluidSimulation {
 
   addDensity(x: number, y: number, r: number, g: number, b: number): void {
     const idx = this.index(x, y);
-    this.setArrayValue(this.densityR, idx, this.getArrayValue(this.densityR, idx) + r);
-    this.setArrayValue(this.densityG, idx, this.getArrayValue(this.densityG, idx) + g);
-    this.setArrayValue(this.densityB, idx, this.getArrayValue(this.densityB, idx) + b);
+    this.setArrayValue(
+      this.densityR,
+      idx,
+      this.getArrayValue(this.densityR, idx) + r,
+    );
+    this.setArrayValue(
+      this.densityG,
+      idx,
+      this.getArrayValue(this.densityG, idx) + g,
+    );
+    this.setArrayValue(
+      this.densityB,
+      idx,
+      this.getArrayValue(this.densityB, idx) + b,
+    );
   }
 
   addVelocity(x: number, y: number, amountX: number, amountY: number): void {
@@ -304,9 +316,27 @@ export class FluidSimulation {
     this.diffuse(0, this.prevDensityG, this.densityG, this.diffusion);
     this.diffuse(0, this.prevDensityB, this.densityB, this.diffusion);
 
-    this.advect(0, this.densityR, this.prevDensityR, this.velocityX, this.velocityY);
-    this.advect(0, this.densityG, this.prevDensityG, this.velocityX, this.velocityY);
-    this.advect(0, this.densityB, this.prevDensityB, this.velocityX, this.velocityY);
+    this.advect(
+      0,
+      this.densityR,
+      this.prevDensityR,
+      this.velocityX,
+      this.velocityY,
+    );
+    this.advect(
+      0,
+      this.densityG,
+      this.prevDensityG,
+      this.velocityX,
+      this.velocityY,
+    );
+    this.advect(
+      0,
+      this.densityB,
+      this.prevDensityB,
+      this.velocityX,
+      this.velocityY,
+    );
 
     // Apply decay to the density arrays
     for (let i = 0; i < this.densityR.length; i++) {
