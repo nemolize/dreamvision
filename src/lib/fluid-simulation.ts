@@ -12,7 +12,7 @@ export class FluidSimulation {
   private prevVelocityX: number[];
   private prevVelocityY: number[];
 
-  constructor(width: number, height: number, scale: number = 1) {
+  constructor(width: number, height: number) {
     this.width = width;
     this.height = height;
     this.viscosity = 0.0001;
