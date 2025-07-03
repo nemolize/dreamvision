@@ -340,9 +340,9 @@ export class FluidSimulation {
 
     // Apply decay to the density arrays
     for (let i = 0; i < this.densityR.length; i++) {
-      this.densityR[i] *= this.decay;
-      this.densityG[i] *= this.decay;
-      this.densityB[i] *= this.decay;
+      this.densityR[i]! *= this.decay;
+      this.densityG[i]! *= this.decay;
+      this.densityB[i]! *= this.decay;
     }
   }
 
