@@ -279,7 +279,7 @@ export const FluidCanvas = ({
         ref={canvasRef}
         width={canvasWidth * canvasScale}
         height={canvasHeight * canvasScale}
-        className={`border border-gray-300 bg-black touch-none rounded-lg ${
+        className={`touch-none rounded-lg border border-gray-300 bg-black ${
           isMobile ? "w-full max-w-sm" : "cursor-crosshair"
         }`}
         style={{
@@ -300,14 +300,14 @@ export const FluidCanvas = ({
       />
 
       <motion.div
-        className={`flex flex-wrap gap-2 sm:gap-4 items-center justify-center ${isMobile ? "text-sm" : ""}`}
+        className={`flex flex-wrap items-center justify-center gap-2 sm:gap-4 ${isMobile ? "text-sm" : ""}`}
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 0.3, duration: 0.5 }}
       >
         <motion.button
           onClick={toggleSimulation}
-          className={`${isMobile ? "px-3 py-2 text-sm" : "px-4 py-2"} bg-blue-500 text-white rounded hover:bg-blue-600 active:bg-blue-700 transition-colors`}
+          className={`${isMobile ? "px-3 py-2 text-sm" : "px-4 py-2"} rounded bg-blue-500 text-white transition-colors hover:bg-blue-600 active:bg-blue-700`}
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
         >
@@ -316,7 +316,7 @@ export const FluidCanvas = ({
 
         <motion.button
           onClick={clearSimulation}
-          className={`${isMobile ? "px-3 py-2 text-sm" : "px-4 py-2"} bg-red-500 text-white rounded hover:bg-red-600 active:bg-red-700 transition-colors`}
+          className={`${isMobile ? "px-3 py-2 text-sm" : "px-4 py-2"} rounded bg-red-500 text-white transition-colors hover:bg-red-600 active:bg-red-700`}
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
         >
@@ -326,7 +326,7 @@ export const FluidCanvas = ({
         <div
           className={`flex items-center space-x-2 ${isMobile ? "flex-col space-x-0 space-y-1" : ""}`}
         >
-          <label className="text-sm font-medium">Viscosity:</label>
+          <label className="font-medium text-sm">Viscosity:</label>
           <div className="flex items-center space-x-2">
             <input
               type="range"
@@ -337,7 +337,7 @@ export const FluidCanvas = ({
               onChange={(e) => updateViscosity(parseFloat(e.target.value))}
               className={isMobile ? "w-20" : "w-24"}
             />
-            <span className="text-xs text-gray-600 min-w-12">
+            <span className="min-w-12 text-gray-600 text-xs">
               {viscosity.toFixed(5)}
             </span>
           </div>
@@ -346,7 +346,7 @@ export const FluidCanvas = ({
         <div
           className={`flex items-center space-x-2 ${isMobile ? "flex-col space-x-0 space-y-1" : ""}`}
         >
-          <label className="text-sm font-medium">Diffusion:</label>
+          <label className="font-medium text-sm">Diffusion:</label>
           <div className="flex items-center space-x-2">
             <input
               type="range"
@@ -357,7 +357,7 @@ export const FluidCanvas = ({
               onChange={(e) => updateDiffusion(parseFloat(e.target.value))}
               className={isMobile ? "w-20" : "w-24"}
             />
-            <span className="text-xs text-gray-600 min-w-12">
+            <span className="min-w-12 text-gray-600 text-xs">
               {diffusion.toFixed(5)}
             </span>
           </div>
@@ -365,7 +365,7 @@ export const FluidCanvas = ({
       </motion.div>
 
       <motion.div
-        className="text-sm text-gray-600 text-center max-w-md"
+        className="max-w-md text-center text-gray-600 text-sm"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 0.5, duration: 0.5 }}

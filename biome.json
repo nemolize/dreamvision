@@ -18,6 +18,12 @@
           "level": "error",
           "fix": "safe"
         }
+      },
+      "nursery": {
+        "useSortedClasses": {
+          "level": "error",
+          "fix": "safe"
+        }
       }
     }
   }
