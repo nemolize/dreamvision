@@ -25,9 +25,18 @@ export const FluidCanvas = ({
   const [mouseDown, setMouseDown] = useState(false);
   const [prevMousePos, setPrevMousePos] = useState({ x: 0, y: 0 });
   const [touchActive, setTouchActive] = useState(false);
+  const [color, setColor] = useState({ r: 255, g: 0, b: 0 });
 
   const { width: windowWidth } = useWindowSize();
   const isMobile = windowWidth < 768;
+
+  const changeColor = useCallback(() => {
+    setColor({
+      r: Math.random() * 255,
+      g: Math.random() * 255,
+      b: Math.random() * 255,
+    });
+  }, []);
 
   // Responsive dimensions
   const canvasWidth = isMobile ? 80 : width;
@@ -53,20 +62,15 @@ export const FluidCanvas = ({
       canvasHeight * canvasScale,
     );
     const data = imageData.data;
-    const densityArray = simulation.getDensityArray();
+    const densityArrays = simulation.getDensityArrays();
     const velocityArrays = simulation.getVelocityArrays();
 
     for (let j = 0; j < canvasHeight; j++) {
       for (let i = 0; i < canvasWidth; i++) {
         const index = i + 1 + (canvasWidth + 2) * (j + 1);
-        const density = Math.min(1, Math.max(0, densityArray[index] ?? 0));
-        const velocity = Math.sqrt(
-          (velocityArrays.x[index] ?? 0) ** 2 +
-            (velocityArrays.y[index] ?? 0) ** 2,
-        );
-
-        const alpha = Math.floor(density * 255);
-        const velocityColor = Math.min(255, Math.max(0, velocity * 500));
+        const r = Math.min(255, Math.max(0, densityArrays.r[index] ?? 0));
+        const g = Math.min(255, Math.max(0, densityArrays.g[index] ?? 0));
+        const b = Math.min(255, Math.max(0, densityArrays.b[index] ?? 0));
 
         for (let dy = 0; dy < canvasScale; dy++) {
           for (let dx = 0; dx < canvasScale; dx++) {
@@ -74,16 +78,10 @@ export const FluidCanvas = ({
               ((j * canvasScale + dy) * canvasWidth * canvasScale +
                 (i * canvasScale + dx)) *
               4;
-            data[pixelIndex] = Math.min(255, velocityColor + alpha * 0.3);
-            data[pixelIndex + 1] = Math.min(
-              255,
-              alpha * 0.7 + velocityColor * 0.2,
-            );
-            data[pixelIndex + 2] = Math.min(255, alpha + velocityColor * 0.1);
-            data[pixelIndex + 3] = Math.max(
-              30,
-              Math.min(255, alpha + velocityColor * 0.5),
-            );
+            data[pixelIndex] = r;
+            data[pixelIndex + 1] = g;
+            data[pixelIndex + 2] = b;
+            data[pixelIndex + 3] = 255;
           }
         }
       }
@@ -136,7 +134,7 @@ export const FluidCanvas = ({
       const amountY = (y - prevY) * 0.5;
 
       if (x >= 0 && x < canvasWidth && y >= 0 && y < canvasHeight) {
-        simulationRef.current.addDensity(x + 1, y + 1, 100);
+        simulationRef.current.addDensity(x + 1, y + 1, color.r, color.g, color.b);
         simulationRef.current.addVelocity(x + 1, y + 1, amountX, amountY);
 
         for (let i = -1; i <= 1; i++) {
@@ -144,7 +142,7 @@ export const FluidCanvas = ({
             const nx = x + i;
             const ny = y + j;
             if (nx >= 0 && nx < canvasWidth && ny >= 0 && ny < canvasHeight) {
-              simulationRef.current.addDensity(nx + 1, ny + 1, 50);
+              simulationRef.current.addDensity(nx + 1, ny + 1, color.r, color.g, color.b);
               simulationRef.current.addVelocity(
                 nx + 1,
                 ny + 1,
@@ -158,12 +156,13 @@ export const FluidCanvas = ({
 
       setPrevMousePos({ x, y });
     },
-    [mouseDown, prevMousePos, canvasScale, canvasWidth, canvasHeight],
+    [mouseDown, prevMousePos, canvasScale, canvasWidth, canvasHeight, color.r, color.g, color.b],
   );
 
   const handleMouseDown = useCallback(
     (e: React.MouseEvent<HTMLCanvasElement>) => {
       setMouseDown(true);
+      changeColor();
       const canvas = canvasRef.current;
       if (!canvas) return;
 
@@ -183,6 +182,7 @@ export const FluidCanvas = ({
     (e: React.TouchEvent<HTMLCanvasElement>) => {
       e.preventDefault();
       setTouchActive(true);
+      changeColor();
       const canvas = canvasRef.current;
       if (!canvas) return;
 
@@ -193,7 +193,7 @@ export const FluidCanvas = ({
       const y = Math.floor((touch.clientY - rect.top) / canvasScale);
       setPrevMousePos({ x, y });
     },
-    [canvasScale],
+    [canvasScale, changeColor],
   );
 
   const handleTouchMove = useCallback(
@@ -217,7 +217,7 @@ export const FluidCanvas = ({
       const amountY = (y - prevY) * 0.8;
 
       if (x >= 0 && x < canvasWidth && y >= 0 && y < canvasHeight) {
-        simulationRef.current.addDensity(x + 1, y + 1, 150);
+        simulationRef.current.addDensity(x + 1, y + 1, color.r, color.g, color.b);
         simulationRef.current.addVelocity(x + 1, y + 1, amountX, amountY);
 
         for (let dx = -2; dx <= 2; dx++) {
@@ -225,7 +225,7 @@ export const FluidCanvas = ({
             const nx = x + dx;
             const ny = y + dy;
             if (nx >= 0 && nx < canvasWidth && ny >= 0 && ny < canvasHeight) {
-              simulationRef.current.addDensity(nx + 1, ny + 1, 75);
+              simulationRef.current.addDensity(nx + 1, ny + 1, color.r, color.g, color.b);
               simulationRef.current.addVelocity(
                 nx + 1,
                 ny + 1,
@@ -239,7 +239,7 @@ export const FluidCanvas = ({
 
       setPrevMousePos({ x, y });
     },
-    [touchActive, prevMousePos, canvasScale, canvasWidth, canvasHeight],
+    [touchActive, prevMousePos, canvasScale, canvasWidth, canvasHeight, color.r, color.g, color.b],
   );
 
   const handleTouchEnd = useCallback(() => {

@@ -5,12 +5,18 @@ export class FluidSimulation {
   private diffusion: number;
   private dt: number;
 
-  private density: number[];
-  private prevDensity: number[];
+  private densityR: number[];
+  private densityG: number[];
+  private densityB: number[];
+  private prevDensityR: number[];
+  private prevDensityG: number[];
+  private prevDensityB: number[];
   private velocityX: number[];
   private velocityY: number[];
   private prevVelocityX: number[];
   private prevVelocityY: number[];
+
+  private decay: number;
 
   constructor(width: number, height: number) {
     this.width = width;
@@ -18,10 +24,15 @@ export class FluidSimulation {
     this.viscosity = 0.0001;
     this.diffusion = 0.0001;
     this.dt = 0.1;
+    this.decay = 0.995; // Add decay factor
 
     const size = (width + 2) * (height + 2);
-    this.density = new Array(size).fill(0);
-    this.prevDensity = new Array(size).fill(0);
+    this.densityR = new Array(size).fill(0);
+    this.densityG = new Array(size).fill(0);
+    this.densityB = new Array(size).fill(0);
+    this.prevDensityR = new Array(size).fill(0);
+    this.prevDensityG = new Array(size).fill(0);
+    this.prevDensityB = new Array(size).fill(0);
     this.velocityX = new Array(size).fill(0);
     this.velocityY = new Array(size).fill(0);
     this.prevVelocityX = new Array(size).fill(0);
@@ -241,10 +252,11 @@ export class FluidSimulation {
     this.setBoundary(boundary, d);
   }
 
-  addDensity(x: number, y: number, amount: number): void {
+  addDensity(x: number, y: number, r: number, g: number, b: number): void {
     const idx = this.index(x, y);
-    const current = this.getArrayValue(this.density, idx);
-    this.setArrayValue(this.density, idx, current + amount);
+    this.setArrayValue(this.densityR, idx, this.getArrayValue(this.densityR, idx) + r);
+    this.setArrayValue(this.densityG, idx, this.getArrayValue(this.densityG, idx) + g);
+    this.setArrayValue(this.densityB, idx, this.getArrayValue(this.densityB, idx) + b);
   }
 
   addVelocity(x: number, y: number, amountX: number, amountY: number): void {
@@ -288,18 +300,29 @@ export class FluidSimulation {
       this.prevVelocityY,
     );
 
-    this.diffuse(0, this.prevDensity, this.density, this.diffusion);
-    this.advect(
-      0,
-      this.density,
-      this.prevDensity,
-      this.velocityX,
-      this.velocityY,
-    );
+    this.diffuse(0, this.prevDensityR, this.densityR, this.diffusion);
+    this.diffuse(0, this.prevDensityG, this.densityG, this.diffusion);
+    this.diffuse(0, this.prevDensityB, this.densityB, this.diffusion);
+
+    this.advect(0, this.densityR, this.prevDensityR, this.velocityX, this.velocityY);
+    this.advect(0, this.densityG, this.prevDensityG, this.velocityX, this.velocityY);
+    this.advect(0, this.densityB, this.prevDensityB, this.velocityX, this.velocityY);
+
+    // Apply decay to the density arrays
+    for (let i = 0; i < this.densityR.length; i++) {
+      this.densityR[i] *= this.decay;
+      this.densityG[i] *= this.decay;
+      this.densityB[i] *= this.decay;
+    }
   }
 
-  getDensity(x: number, y: number): number {
-    return this.getArrayValue(this.density, this.index(x, y));
+  getRGBDensity(x: number, y: number): { r: number; g: number; b: number } {
+    const idx = this.index(x, y);
+    return {
+      r: this.getArrayValue(this.densityR, idx),
+      g: this.getArrayValue(this.densityG, idx),
+      b: this.getArrayValue(this.densityB, idx),
+    };
   }
 
   getVelocity(x: number, y: number): { x: number; y: number } {
@@ -310,8 +333,12 @@ export class FluidSimulation {
     };
   }
 
-  getDensityArray(): number[] {
-    return this.density;
+  getDensityArrays(): { r: number[]; g: number[]; b: number[] } {
+    return {
+      r: this.densityR,
+      g: this.densityG,
+      b: this.densityB,
+    };
   }
 
   getVelocityArrays(): { x: number[]; y: number[] } {
@@ -330,8 +357,12 @@ export class FluidSimulation {
   }
 
   clear(): void {
-    this.density.fill(0);
-    this.prevDensity.fill(0);
+    this.densityR.fill(0);
+    this.densityG.fill(0);
+    this.densityB.fill(0);
+    this.prevDensityR.fill(0);
+    this.prevDensityG.fill(0);
+    this.prevDensityB.fill(0);
     this.velocityX.fill(0);
     this.velocityY.fill(0);
     this.prevVelocityX.fill(0);
