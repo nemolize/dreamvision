@@ -14,7 +14,7 @@ export default function Home() {
           </p>
         </div>
 
-        <div className="bg-white rounded-xl shadow-lg p-8">
+        <div className="bg-white rounded-xl shadow-lg p-8 text-lg">
           <h2 className="text-3xl font-bold text-gray-800 mb-6 text-center">
             Fluid Simulation
           </h2>
