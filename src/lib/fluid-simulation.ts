@@ -32,31 +32,68 @@ export class FluidSimulation {
     return x + (this.width + 2) * y;
   }
 
+  private getArrayValue(arr: number[], index: number): number {
+    return arr[index] ?? 0;
+  }
+
+  private setArrayValue(arr: number[], index: number, value: number): void {
+    arr[index] = value;
+  }
+
   private setBoundary(boundary: number, x: number[]): void {
     const w = this.width;
     const h = this.height;
 
     for (let i = 1; i <= w; i++) {
-      x[this.index(i, 0)] =
-        boundary === 2 ? -x[this.index(i, 1)] : x[this.index(i, 1)];
-      x[this.index(i, h + 1)] =
-        boundary === 2 ? -x[this.index(i, h)] : x[this.index(i, h)];
+      const val1 = this.getArrayValue(x, this.index(i, 1));
+      const valH = this.getArrayValue(x, this.index(i, h));
+      this.setArrayValue(x, this.index(i, 0), boundary === 2 ? -val1 : val1);
+      this.setArrayValue(
+        x,
+        this.index(i, h + 1),
+        boundary === 2 ? -valH : valH,
+      );
     }
 
     for (let j = 1; j <= h; j++) {
-      x[this.index(0, j)] =
-        boundary === 1 ? -x[this.index(1, j)] : x[this.index(1, j)];
-      x[this.index(w + 1, j)] =
-        boundary === 1 ? -x[this.index(w, j)] : x[this.index(w, j)];
+      const val1 = this.getArrayValue(x, this.index(1, j));
+      const valW = this.getArrayValue(x, this.index(w, j));
+      this.setArrayValue(x, this.index(0, j), boundary === 1 ? -val1 : val1);
+      this.setArrayValue(
+        x,
+        this.index(w + 1, j),
+        boundary === 1 ? -valW : valW,
+      );
     }
 
-    x[this.index(0, 0)] = 0.5 * (x[this.index(1, 0)] + x[this.index(0, 1)]);
-    x[this.index(0, h + 1)] =
-      0.5 * (x[this.index(1, h + 1)] + x[this.index(0, h)]);
-    x[this.index(w + 1, 0)] =
-      0.5 * (x[this.index(w, 0)] + x[this.index(w + 1, 1)]);
-    x[this.index(w + 1, h + 1)] =
-      0.5 * (x[this.index(w, h + 1)] + x[this.index(w + 1, h)]);
+    this.setArrayValue(
+      x,
+      this.index(0, 0),
+      0.5 *
+        (this.getArrayValue(x, this.index(1, 0)) +
+          this.getArrayValue(x, this.index(0, 1))),
+    );
+    this.setArrayValue(
+      x,
+      this.index(0, h + 1),
+      0.5 *
+        (this.getArrayValue(x, this.index(1, h + 1)) +
+          this.getArrayValue(x, this.index(0, h))),
+    );
+    this.setArrayValue(
+      x,
+      this.index(w + 1, 0),
+      0.5 *
+        (this.getArrayValue(x, this.index(w, 0)) +
+          this.getArrayValue(x, this.index(w + 1, 1))),
+    );
+    this.setArrayValue(
+      x,
+      this.index(w + 1, h + 1),
+      0.5 *
+        (this.getArrayValue(x, this.index(w, h + 1)) +
+          this.getArrayValue(x, this.index(w + 1, h))),
+    );
   }
 
   private linearSolve(
@@ -71,14 +108,17 @@ export class FluidSimulation {
       for (let j = 1; j <= this.height; j++) {
         for (let i = 1; i <= this.width; i++) {
           const idx = this.index(i, j);
-          x[idx] =
-            (x0[idx] +
-              a *
-                (x[this.index(i + 1, j)] +
-                  x[this.index(i - 1, j)] +
-                  x[this.index(i, j + 1)] +
-                  x[this.index(i, j - 1)])) *
-            cRecip;
+          const x0Val = this.getArrayValue(x0, idx);
+          const xRight = this.getArrayValue(x, this.index(i + 1, j));
+          const xLeft = this.getArrayValue(x, this.index(i - 1, j));
+          const xDown = this.getArrayValue(x, this.index(i, j + 1));
+          const xUp = this.getArrayValue(x, this.index(i, j - 1));
+
+          this.setArrayValue(
+            x,
+            idx,
+            (x0Val + a * (xRight + xLeft + xDown + xUp)) * cRecip,
+          );
         }
       }
       this.setBoundary(boundary, x);
@@ -107,14 +147,17 @@ export class FluidSimulation {
     for (let j = 1; j <= h; j++) {
       for (let i = 1; i <= w; i++) {
         const idx = this.index(i, j);
-        div[idx] =
-          (-0.5 *
-            (velocX[this.index(i + 1, j)] -
-              velocX[this.index(i - 1, j)] +
-              velocY[this.index(i, j + 1)] -
-              velocY[this.index(i, j - 1)])) /
-          w;
-        p[idx] = 0;
+        const vxRight = this.getArrayValue(velocX, this.index(i + 1, j));
+        const vxLeft = this.getArrayValue(velocX, this.index(i - 1, j));
+        const vyDown = this.getArrayValue(velocY, this.index(i, j + 1));
+        const vyUp = this.getArrayValue(velocY, this.index(i, j - 1));
+
+        this.setArrayValue(
+          div,
+          idx,
+          (-0.5 * (vxRight - vxLeft + vyDown - vyUp)) / w,
+        );
+        this.setArrayValue(p, idx, 0);
       }
     }
 
@@ -125,10 +168,16 @@ export class FluidSimulation {
     for (let j = 1; j <= h; j++) {
       for (let i = 1; i <= w; i++) {
         const idx = this.index(i, j);
-        velocX[idx] -=
-          0.5 * (p[this.index(i + 1, j)] - p[this.index(i - 1, j)]) * w;
-        velocY[idx] -=
-          0.5 * (p[this.index(i, j + 1)] - p[this.index(i, j - 1)]) * h;
+        const pRight = this.getArrayValue(p, this.index(i + 1, j));
+        const pLeft = this.getArrayValue(p, this.index(i - 1, j));
+        const pDown = this.getArrayValue(p, this.index(i, j + 1));
+        const pUp = this.getArrayValue(p, this.index(i, j - 1));
+
+        const currentVx = this.getArrayValue(velocX, idx);
+        const currentVy = this.getArrayValue(velocY, idx);
+
+        this.setArrayValue(velocX, idx, currentVx - 0.5 * (pRight - pLeft) * w);
+        this.setArrayValue(velocY, idx, currentVy - 0.5 * (pDown - pUp) * h);
       }
     }
 
@@ -151,8 +200,8 @@ export class FluidSimulation {
     for (let j = 1; j <= h; j++) {
       for (let i = 1; i <= w; i++) {
         const idx = this.index(i, j);
-        const tmp1 = dtx * velocX[idx];
-        const tmp2 = dty * velocY[idx];
+        const tmp1 = dtx * this.getArrayValue(velocX, idx);
+        const tmp2 = dty * this.getArrayValue(velocY, idx);
         let x = i - tmp1;
         let y = j - tmp2;
 
@@ -176,9 +225,16 @@ export class FluidSimulation {
         const j0i = Math.floor(j0);
         const j1i = Math.floor(j1);
 
-        d[idx] =
-          s0 * (t0 * d0[this.index(i0i, j0i)] + t1 * d0[this.index(i0i, j1i)]) +
-          s1 * (t0 * d0[this.index(i1i, j0i)] + t1 * d0[this.index(i1i, j1i)]);
+        const val00 = this.getArrayValue(d0, this.index(i0i, j0i));
+        const val01 = this.getArrayValue(d0, this.index(i0i, j1i));
+        const val10 = this.getArrayValue(d0, this.index(i1i, j0i));
+        const val11 = this.getArrayValue(d0, this.index(i1i, j1i));
+
+        this.setArrayValue(
+          d,
+          idx,
+          s0 * (t0 * val00 + t1 * val01) + s1 * (t0 * val10 + t1 * val11),
+        );
       }
     }
 
@@ -187,13 +243,16 @@ export class FluidSimulation {
 
   addDensity(x: number, y: number, amount: number): void {
     const idx = this.index(x, y);
-    this.density[idx] += amount;
+    const current = this.getArrayValue(this.density, idx);
+    this.setArrayValue(this.density, idx, current + amount);
   }
 
   addVelocity(x: number, y: number, amountX: number, amountY: number): void {
     const idx = this.index(x, y);
-    this.velocityX[idx] += amountX;
-    this.velocityY[idx] += amountY;
+    const currentX = this.getArrayValue(this.velocityX, idx);
+    const currentY = this.getArrayValue(this.velocityY, idx);
+    this.setArrayValue(this.velocityX, idx, currentX + amountX);
+    this.setArrayValue(this.velocityY, idx, currentY + amountY);
   }
 
   step(): void {
@@ -240,14 +299,14 @@ export class FluidSimulation {
   }
 
   getDensity(x: number, y: number): number {
-    return this.density[this.index(x, y)];
+    return this.getArrayValue(this.density, this.index(x, y));
   }
 
   getVelocity(x: number, y: number): { x: number; y: number } {
     const idx = this.index(x, y);
     return {
-      x: this.velocityX[idx],
-      y: this.velocityY[idx],
+      x: this.getArrayValue(this.velocityX, idx),
+      y: this.getArrayValue(this.velocityY, idx),
     };
   }
 

@@ -1,5 +1,6 @@
 "use client";
 
+import clsx from "clsx";
 import { motion } from "motion/react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useWindowSize } from "react-use";
@@ -34,14 +35,10 @@ export const FluidCanvas = ({
   const canvasScale = isMobile ? 4 : scale;
 
   const initializeSimulation = useCallback(() => {
-    simulationRef.current = new FluidSimulation(
-      canvasWidth,
-      canvasHeight,
-      canvasScale,
-    );
+    simulationRef.current = new FluidSimulation(canvasWidth, canvasHeight);
     simulationRef.current.setViscosity(viscosity);
     simulationRef.current.setDiffusion(diffusion);
-  }, [canvasWidth, canvasHeight, canvasScale, viscosity, diffusion]);
+  }, [canvasWidth, canvasHeight, viscosity, diffusion]);
 
   const drawFluid = useCallback(() => {
     const canvas = canvasRef.current;
@@ -62,9 +59,10 @@ export const FluidCanvas = ({
     for (let j = 0; j < canvasHeight; j++) {
       for (let i = 0; i < canvasWidth; i++) {
         const index = i + 1 + (canvasWidth + 2) * (j + 1);
-        const density = Math.min(1, Math.max(0, densityArray[index]));
+        const density = Math.min(1, Math.max(0, densityArray[index] ?? 0));
         const velocity = Math.sqrt(
-          velocityArrays.x[index] ** 2 + velocityArrays.y[index] ** 2,
+          (velocityArrays.x[index] ?? 0) ** 2 +
+            (velocityArrays.y[index] ?? 0) ** 2,
         );
 
         const alpha = Math.floor(density * 255);
@@ -190,6 +188,7 @@ export const FluidCanvas = ({
 
       const rect = canvas.getBoundingClientRect();
       const touch = e.touches[0];
+      if (!touch) return;
       const x = Math.floor((touch.clientX - rect.left) / canvasScale);
       const y = Math.floor((touch.clientY - rect.top) / canvasScale);
       setPrevMousePos({ x, y });
@@ -207,6 +206,7 @@ export const FluidCanvas = ({
 
       const rect = canvas.getBoundingClientRect();
       const touch = e.touches[0];
+      if (!touch) return;
       const x = Math.floor((touch.clientX - rect.left) / canvasScale);
       const y = Math.floor((touch.clientY - rect.top) / canvasScale);
 
@@ -279,9 +279,10 @@ export const FluidCanvas = ({
         ref={canvasRef}
         width={canvasWidth * canvasScale}
         height={canvasHeight * canvasScale}
-        className={`touch-none rounded-lg border border-gray-300 bg-black ${
-          isMobile ? "w-full max-w-sm" : "cursor-crosshair"
-        }`}
+        className={clsx(
+          "touch-none rounded-lg border border-gray-300 bg-black",
+          isMobile ? "w-full max-w-sm" : "cursor-crosshair",
+        )}
         style={{
           maxWidth: isMobile ? "100%" : `${canvasWidth * canvasScale}px`,
           height: "auto",
@@ -300,14 +301,20 @@ export const FluidCanvas = ({
       />
 
       <motion.div
-        className={`flex flex-wrap items-center justify-center gap-2 sm:gap-4 ${isMobile ? "text-sm" : ""}`}
+        className={clsx(
+          "flex flex-wrap items-center justify-center gap-2 sm:gap-4",
+          isMobile && "text-sm",
+        )}
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 0.3, duration: 0.5 }}
       >
         <motion.button
           onClick={toggleSimulation}
-          className={`${isMobile ? "px-3 py-2 text-sm" : "px-4 py-2"} rounded bg-blue-500 text-white transition-colors hover:bg-blue-600 active:bg-blue-700`}
+          className={clsx(
+            "rounded bg-blue-500 text-white transition-colors hover:bg-blue-600 active:bg-blue-700",
+            isMobile ? "px-3 py-2 text-sm" : "px-4 py-2",
+          )}
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
         >
@@ -316,7 +323,10 @@ export const FluidCanvas = ({
 
         <motion.button
           onClick={clearSimulation}
-          className={`${isMobile ? "px-3 py-2 text-sm" : "px-4 py-2"} rounded bg-red-500 text-white transition-colors hover:bg-red-600 active:bg-red-700`}
+          className={clsx(
+            "rounded bg-red-500 text-white transition-colors hover:bg-red-600 active:bg-red-700",
+            isMobile ? "px-3 py-2 text-sm" : "px-4 py-2",
+          )}
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
         >
@@ -324,11 +334,17 @@ export const FluidCanvas = ({
         </motion.button>
 
         <div
-          className={`flex items-center space-x-2 ${isMobile ? "flex-col space-x-0 space-y-1" : ""}`}
+          className={clsx(
+            "flex items-center space-x-2",
+            isMobile && "flex-col space-x-0 space-y-1",
+          )}
         >
-          <label className="font-medium text-sm">Viscosity:</label>
+          <label htmlFor="viscosity-slider" className="font-medium text-sm">
+            Viscosity:
+          </label>
           <div className="flex items-center space-x-2">
             <input
+              id="viscosity-slider"
               type="range"
               min="0.00001"
               max="0.001"
@@ -344,11 +360,17 @@ export const FluidCanvas = ({
         </div>
 
         <div
-          className={`flex items-center space-x-2 ${isMobile ? "flex-col space-x-0 space-y-1" : ""}`}
+          className={clsx(
+            "flex items-center space-x-2",
+            isMobile && "flex-col space-x-0 space-y-1",
+          )}
         >
-          <label className="font-medium text-sm">Diffusion:</label>
+          <label htmlFor="diffusion-slider" className="font-medium text-sm">
+            Diffusion:
+          </label>
           <div className="flex items-center space-x-2">
             <input
+              id="diffusion-slider"
               type="range"
               min="0.00001"
               max="0.001"
