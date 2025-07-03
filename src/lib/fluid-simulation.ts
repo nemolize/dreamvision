@@ -151,8 +151,8 @@ export class FluidSimulation {
     for (let j = 1; j <= h; j++) {
       for (let i = 1; i <= w; i++) {
         const idx = this.index(i, j);
-        let tmp1 = dtx * velocX[idx];
-        let tmp2 = dty * velocY[idx];
+        const tmp1 = dtx * velocX[idx];
+        const tmp2 = dty * velocY[idx];
         let x = i - tmp1;
         let y = j - tmp2;
 

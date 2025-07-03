@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback } from "react";
-import { useWindowSize } from "react-use";
 import { motion } from "motion/react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useWindowSize } from "react-use";
 import { FluidSimulation } from "@/lib/fluid-simulation";
 
 interface FluidCanvasProps {
