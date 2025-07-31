@@ -6,10 +6,13 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "biome check .",
-    "lint:fix": "biome check --write .",
-    "format": "biome format --write .",
-    "typecheck": "tsc --noEmit"
+    "lint": "run-p --continue-on-error 'lint:*'",
+    "lint:eslint": "eslint .",
+    "lint:typecheck": "tsc --noEmit",
+    "lint:prettier": "prettier --check .",
+    "fix": "run-s --continue-on-error fix:eslint fix:prettier",
+    "fix:eslint": "eslint . --fix",
+    "fix:prettier": "prettier --write ."
   },
   "dependencies": {
     "@types/node": "22.16.4",
@@ -26,8 +29,19 @@
   },
   "devDependencies": {
     "@biomejs/biome": "^2.0.6",
+    "@eslint/compat": "^1.3.1",
+    "@eslint/js": "^9.32.0",
     "@tailwindcss/postcss": "^4.1.11",
     "autoprefixer": "^10.4.21",
-    "tailwindcss": "^4.1.11"
+    "eslint": "^9.32.0",
+    "eslint-plugin-react-hooks": "^5.2.0",
+    "eslint-plugin-simple-import-sort": "^12.1.1",
+    "eslint-plugin-unused-imports": "^4.1.4",
+    "globals": "^16.3.0",
+    "npm-run-all2": "^8.0.4",
+    "prettier": "^3.6.2",
+    "prettier-plugin-tailwindcss": "^0.6.14",
+    "tailwindcss": "^4.1.11",
+    "typescript-eslint": "^8.38.0"
   }
 }
