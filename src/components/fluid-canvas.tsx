@@ -4,6 +4,7 @@ import clsx from "clsx";
 import { motion } from "motion/react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useWindowSize } from "react-use";
+
 import { FluidSimulation } from "@/lib/fluid-simulation";
 
 interface FluidCanvasProps {
@@ -377,10 +378,10 @@ export const FluidCanvas = ({
         <div
           className={clsx(
             "flex items-center space-x-2",
-            isMobile && "flex-col space-x-0 space-y-1",
+            isMobile && "flex-col space-y-1 space-x-0",
           )}
         >
-          <label htmlFor="viscosity-slider" className="font-medium text-sm">
+          <label htmlFor="viscosity-slider" className="text-sm font-medium">
             Viscosity:
           </label>
           <div className="flex items-center space-x-2">
@@ -394,7 +395,7 @@ export const FluidCanvas = ({
               onChange={(e) => updateViscosity(parseFloat(e.target.value))}
               className={isMobile ? "w-20" : "w-24"}
             />
-            <span className="min-w-12 text-gray-600 text-xs">
+            <span className="min-w-12 text-xs text-gray-600">
               {viscosity.toFixed(5)}
             </span>
           </div>
@@ -403,10 +404,10 @@ export const FluidCanvas = ({
         <div
           className={clsx(
             "flex items-center space-x-2",
-            isMobile && "flex-col space-x-0 space-y-1",
+            isMobile && "flex-col space-y-1 space-x-0",
           )}
         >
-          <label htmlFor="diffusion-slider" className="font-medium text-sm">
+          <label htmlFor="diffusion-slider" className="text-sm font-medium">
             Diffusion:
           </label>
           <div className="flex items-center space-x-2">
@@ -420,7 +421,7 @@ export const FluidCanvas = ({
               onChange={(e) => updateDiffusion(parseFloat(e.target.value))}
               className={isMobile ? "w-20" : "w-24"}
             />
-            <span className="min-w-12 text-gray-600 text-xs">
+            <span className="min-w-12 text-xs text-gray-600">
               {diffusion.toFixed(5)}
             </span>
           </div>
@@ -428,7 +429,7 @@ export const FluidCanvas = ({
       </motion.div>
 
       <motion.div
-        className="max-w-md text-center text-gray-600 text-sm"
+        className="max-w-md text-center text-sm text-gray-600"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 0.5, duration: 0.5 }}
