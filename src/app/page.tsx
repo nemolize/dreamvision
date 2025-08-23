@@ -1,4 +1,4 @@
-import { FluidCanvas } from "@/components/fluid-canvas";
+import { FluidCanvas } from "@/components/FluidCanvas";
 
 export default function Home() {
   return (
