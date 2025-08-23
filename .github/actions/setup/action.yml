@@ -4,6 +4,6 @@ description: "Setup Node.js environment, pnpm, cache, and install dependencies"
 runs:
   using: "composite"
   steps:
-    - uses: jdx/mise-action@v2
+    - uses: jdx/mise-action@v3
     - run: pnpm install --frozen-lockfile
       shell: bash
