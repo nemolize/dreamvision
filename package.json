@@ -13,7 +13,8 @@
     "lint:prettier": "prettier --check .",
     "fix": "run-s --continue-on-error fix:eslint fix:prettier",
     "fix:eslint": "eslint . --fix",
-    "fix:prettier": "prettier --write ."
+    "fix:prettier": "prettier --write .",
+    "prepare": "lefthook install"
   },
   "dependencies": {
     "@types/node": "22.16.4",
@@ -38,6 +39,7 @@
     "eslint-plugin-simple-import-sort": "^12.1.1",
     "eslint-plugin-unused-imports": "^4.1.4",
     "globals": "^16.3.0",
+    "lefthook": "^1.12.3",
     "npm-run-all2": "^8.0.4",
     "prettier": "^3.6.2",
     "prettier-plugin-tailwindcss": "^0.6.14",
