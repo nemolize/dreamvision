@@ -24,7 +24,7 @@ jobs:
         with:
           static_site_generator: next
       - run: pnpm build
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/upload-pages-artifact@v4
         with:
           path: ./out
 
