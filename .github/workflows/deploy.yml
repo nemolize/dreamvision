@@ -53,3 +53,9 @@ jobs:
         uses: marocchino/sticky-pull-request-comment@v2
         with:
           message: ${{ steps.deploy.outputs.preview_line }}
+
+      - if: failure()
+        name: Show error message in sticky comment
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          message: "Version Preview URL: ❌deployment failed."
