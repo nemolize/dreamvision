@@ -20,7 +20,7 @@
     "@opennextjs/cloudflare": "^1.7.1",
     "@types/node": "22.18.10",
     "@types/react": "19.2.2",
-    "@types/react-dom": "19.2.1",
+    "@types/react-dom": "19.2.2",
     "clsx": "^2.1.1",
     "motion": "^12.23.12",
     "next": "15.5.4",
