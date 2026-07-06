@@ -1,34 +1,46 @@
-This is a [Next.js](https://nextjs.org/) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
+# DreamVision
+
+Interactive real-time 2D fluid dynamics simulation in the browser, based on
+Jos Stam's ["Real-Time Fluid Dynamics for Games"](https://www.dgp.toronto.edu/public_user/stam/reality/Research/pdf/GDC03.pdf)
+(a Navier-Stokes solver), rendered on an HTML canvas.
+
+Built with [Next.js](https://nextjs.org/) (App Router) + [Tailwind CSS](https://tailwindcss.com/),
+deployed to [Cloudflare Workers](https://workers.cloudflare.com/) via
+[OpenNext](https://opennext.js.org/cloudflare).
 
 ## Getting Started
 
-First, run the development server:
+Requirements: Node.js and pnpm (versions are pinned in `mise.toml` — run
+`mise install` if you use [mise](https://mise.jdx.dev/)).
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
+pnpm install
 pnpm dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000) and click / touch-drag on
+the canvas to add fluid.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Scripts
 
-This project uses [`next/font`](https://nextjs.org/docs/basic-features/font-optimization) to automatically optimize and load Inter, a custom Google Font.
+| Script       | What it does                                       |
+| ------------ | -------------------------------------------------- |
+| `pnpm dev`   | Start the development server                       |
+| `pnpm build` | Production build                                   |
+| `pnpm lint`  | ESLint + type-check + Prettier check (in parallel) |
+| `pnpm fix`   | Auto-fix ESLint and Prettier issues                |
+| `pnpm test`  | Run unit tests (Vitest)                            |
 
-## Learn More
+## Project Layout
 
-To learn more about Next.js, take a look at the following resources:
+- `src/lib/fluid-simulation.ts` — the fluid solver (pure TypeScript, no DOM);
+  unit-tested in `src/lib/fluid-simulation.test.ts`
+- `src/components/FluidCanvas.tsx` — canvas rendering, pointer interaction,
+  and simulation controls
+- `src/app/` — Next.js App Router pages
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Deployment
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js/) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/deployment) for more details.
+Pushes to `main` deploy to Cloudflare Workers via the `Deploy` GitHub Actions
+workflow (OpenNext build + `opennextjs-cloudflare deploy`). Pull requests get
+a preview upload with the version preview URL posted as a sticky PR comment.
