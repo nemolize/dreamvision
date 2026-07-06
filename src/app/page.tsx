@@ -18,7 +18,7 @@ export default function Home() {
           <h2 className="mb-6 text-center text-3xl font-bold text-gray-800">
             Fluid Simulation
           </h2>
-          <FluidCanvas />
+          <FluidCanvas width={120} height={80} scale={6} />
         </div>
       </div>
     </main>
