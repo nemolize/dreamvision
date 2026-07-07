@@ -1,9 +1,13 @@
 "use client";
 
 import clsx from "clsx";
-import { motion } from "motion/react";
-import { useCallback, useEffect, useRef, useState } from "react";
-import { useWindowSize } from "react-use";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 
 import { FluidSimulation } from "@/lib/fluid-simulation";
 
@@ -13,6 +17,90 @@ interface FluidCanvasProps {
   scale?: number;
 }
 
+interface RGB {
+  r: number;
+  g: number;
+  b: number;
+}
+
+/** Offscreen buffer at simulation resolution, reused across frames. */
+interface RenderBuffer {
+  canvas: HTMLCanvasElement;
+  ctx: CanvasRenderingContext2D;
+  image: ImageData;
+}
+
+const MOBILE_BREAKPOINT_PX = 768;
+const DEFAULT_VISCOSITY = 0.0001;
+const DEFAULT_DIFFUSION = 0.0001;
+
+const createRenderBuffer = (
+  width: number,
+  height: number,
+): RenderBuffer | null => {
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext("2d");
+  if (ctx == null) return null;
+  return { canvas, ctx, image: ctx.createImageData(width, height) };
+};
+
+/**
+ * Paint the density field into the buffer at simulation resolution, then
+ * upscale via drawImage — far fewer pixel writes than filling the scaled
+ * canvas cell by cell, with bilinear smoothing for free.
+ */
+const renderFrame = (
+  target: HTMLCanvasElement,
+  targetCtx: CanvasRenderingContext2D,
+  buffer: RenderBuffer,
+  simulation: FluidSimulation,
+  simWidth: number,
+  simHeight: number,
+): void => {
+  const data = buffer.image.data;
+  const { r, g, b } = simulation.getDensityArrays();
+  const stride = simWidth + 2;
+
+  let pixel = 0;
+  for (let j = 0; j < simHeight; j++) {
+    let index = 1 + stride * (j + 1);
+    for (let i = 0; i < simWidth; i++, index++, pixel += 4) {
+      // Uint8ClampedArray clamps and rounds on assignment.
+      data[pixel] = r[index] ?? 0;
+      data[pixel + 1] = g[index] ?? 0;
+      data[pixel + 2] = b[index] ?? 0;
+      data[pixel + 3] = 255;
+    }
+  }
+
+  buffer.ctx.putImageData(buffer.image, 0, 0);
+  targetCtx.imageSmoothingEnabled = true;
+  targetCtx.drawImage(buffer.canvas, 0, 0, target.width, target.height);
+};
+
+const MOBILE_MEDIA_QUERY = `(max-width: ${MOBILE_BREAKPOINT_PX - 1}px)`;
+
+const subscribeToMediaQuery = (onStoreChange: () => void) => {
+  const mql = window.matchMedia(MOBILE_MEDIA_QUERY);
+  mql.addEventListener("change", onStoreChange);
+  return () => mql.removeEventListener("change", onStoreChange);
+};
+
+const useIsMobile = (): boolean =>
+  useSyncExternalStore(
+    subscribeToMediaQuery,
+    () => window.matchMedia(MOBILE_MEDIA_QUERY).matches,
+    () => false,
+  );
+
+const randomColor = (): RGB => ({
+  r: Math.random() * 255,
+  g: Math.random() * 255,
+  b: Math.random() * 255,
+});
+
 export const FluidCanvas = ({
   width = 120,
   height = 80,
@@ -20,277 +108,146 @@ export const FluidCanvas = ({
 }: FluidCanvasProps) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const simulationRef = useRef<FluidSimulation | null>(null);
+
+  // Pointer interaction state lives in refs: it changes on every pointermove
+  // and must not trigger React re-renders.
+  const pointerActiveRef = useRef(false);
+  const prevPosRef = useRef({ x: 0, y: 0 });
+  const colorRef = useRef<RGB>(randomColor());
+  const paramsRef = useRef({
+    viscosity: DEFAULT_VISCOSITY,
+    diffusion: DEFAULT_DIFFUSION,
+  });
+
   const [isRunning, setIsRunning] = useState(true);
-  const [viscosity, setViscosity] = useState(0.0001);
-  const [diffusion, setDiffusion] = useState(0.0001);
-  const [mouseDown, setMouseDown] = useState(false);
-  const [prevMousePos, setPrevMousePos] = useState({ x: 0, y: 0 });
-  const [touchActive, setTouchActive] = useState(false);
-  const [color, setColor] = useState({ r: 255, g: 0, b: 0 });
+  const [viscosity, setViscosity] = useState(DEFAULT_VISCOSITY);
+  const [diffusion, setDiffusion] = useState(DEFAULT_DIFFUSION);
 
-  const { width: windowWidth } = useWindowSize();
-  const isMobile = windowWidth < 768;
-
-  const changeColor = useCallback(() => {
-    setColor({
-      r: Math.random() * 255,
-      g: Math.random() * 255,
-      b: Math.random() * 255,
-    });
-  }, []);
+  const isMobile = useIsMobile();
 
   // Responsive dimensions
   const canvasWidth = isMobile ? 80 : width;
   const canvasHeight = isMobile ? 60 : height;
   const canvasScale = isMobile ? 4 : scale;
 
-  const initializeSimulation = useCallback(() => {
-    simulationRef.current = new FluidSimulation(canvasWidth, canvasHeight);
-    simulationRef.current.setViscosity(viscosity);
-    simulationRef.current.setDiffusion(diffusion);
-  }, [canvasWidth, canvasHeight, viscosity, diffusion]);
-
-  const drawFluid = useCallback(() => {
-    const canvas = canvasRef.current;
-    const simulation = simulationRef.current;
-    if (!canvas || !simulation) return;
-
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-
-    const imageData = ctx.createImageData(
-      canvasWidth * canvasScale,
-      canvasHeight * canvasScale,
-    );
-    const data = imageData.data;
-    const densityArrays = simulation.getDensityArrays();
-
-    for (let j = 0; j < canvasHeight; j++) {
-      for (let i = 0; i < canvasWidth; i++) {
-        const index = i + 1 + (canvasWidth + 2) * (j + 1);
-        const r = Math.min(255, Math.max(0, densityArrays.r[index] ?? 0));
-        const g = Math.min(255, Math.max(0, densityArrays.g[index] ?? 0));
-        const b = Math.min(255, Math.max(0, densityArrays.b[index] ?? 0));
-
-        for (let dy = 0; dy < canvasScale; dy++) {
-          for (let dx = 0; dx < canvasScale; dx++) {
-            const pixelIndex =
-              ((j * canvasScale + dy) * canvasWidth * canvasScale +
-                (i * canvasScale + dx)) *
-              4;
-            data[pixelIndex] = r;
-            data[pixelIndex + 1] = g;
-            data[pixelIndex + 2] = b;
-            data[pixelIndex + 3] = 255;
-          }
-        }
-      }
-    }
-
-    ctx.putImageData(imageData, 0, 0);
-  }, [canvasWidth, canvasHeight, canvasScale]);
-
-  // Animation loop using framer-motion's useAnimate
+  // Re-create the simulation only when the grid size changes; parameter
+  // tweaks go through the setters so slider input doesn't reset the fluid.
   useEffect(() => {
-    let animationId: number;
+    const simulation = new FluidSimulation(canvasWidth, canvasHeight);
+    simulation.setViscosity(paramsRef.current.viscosity);
+    simulation.setDiffusion(paramsRef.current.diffusion);
+    simulationRef.current = simulation;
+  }, [canvasWidth, canvasHeight]);
 
+  // Animation loop: step the simulation and repaint on each animation frame.
+  useEffect(() => {
+    if (!isRunning) return;
+
+    const canvas = canvasRef.current;
+    const ctx = canvas?.getContext("2d") ?? null;
+    const buffer = createRenderBuffer(canvasWidth, canvasHeight);
+    if (canvas == null || ctx == null || buffer == null) return;
+
+    let animationId = 0;
     const animate = () => {
-      if (isRunning) {
-        const simulation = simulationRef.current;
-        if (simulation) {
-          simulation.step();
-          drawFluid();
-        }
-        animationId = requestAnimationFrame(animate);
+      const simulation = simulationRef.current;
+      if (simulation != null) {
+        simulation.step();
+        renderFrame(canvas, ctx, buffer, simulation, canvasWidth, canvasHeight);
       }
-    };
-
-    if (isRunning) {
       animationId = requestAnimationFrame(animate);
-    }
-
-    return () => {
-      if (animationId) {
-        cancelAnimationFrame(animationId);
-      }
     };
-  }, [isRunning, drawFluid]);
+    animationId = requestAnimationFrame(animate);
 
-  const handleMouseMove = useCallback(
-    (e: React.MouseEvent<HTMLCanvasElement>) => {
-      if (!mouseDown || !simulationRef.current) return;
+    return () => cancelAnimationFrame(animationId);
+  }, [isRunning, canvasWidth, canvasHeight]);
 
+  /** Map a pointer event to simulation-grid coordinates (CSS-scale aware). */
+  const getCellPosition = useCallback(
+    (e: React.PointerEvent<HTMLCanvasElement>) => {
       const canvas = canvasRef.current;
-      if (!canvas) return;
+      if (canvas == null) return null;
 
       const rect = canvas.getBoundingClientRect();
-      const x = Math.floor((e.clientX - rect.left) / canvasScale);
-      const y = Math.floor((e.clientY - rect.top) / canvasScale);
+      const x = Math.floor(
+        ((e.clientX - rect.left) / rect.width) * canvasWidth,
+      );
+      const y = Math.floor(
+        ((e.clientY - rect.top) / rect.height) * canvasHeight,
+      );
+      return { x, y };
+    },
+    [canvasWidth, canvasHeight],
+  );
 
-      const prevX = prevMousePos.x;
-      const prevY = prevMousePos.y;
+  const handlePointerDown = useCallback(
+    (e: React.PointerEvent<HTMLCanvasElement>) => {
+      const position = getCellPosition(e);
+      if (position == null) return;
 
-      const amountX = (x - prevX) * 0.5;
-      const amountY = (y - prevY) * 0.5;
+      pointerActiveRef.current = true;
+      colorRef.current = randomColor();
+      prevPosRef.current = position;
+      e.currentTarget.setPointerCapture(e.pointerId);
+    },
+    [getCellPosition],
+  );
 
-      if (x >= 0 && x < canvasWidth && y >= 0 && y < canvasHeight) {
-        simulationRef.current.addDensity(
-          x + 1,
-          y + 1,
-          color.r,
-          color.g,
-          color.b,
-        );
-        simulationRef.current.addVelocity(x + 1, y + 1, amountX, amountY);
+  const handlePointerMove = useCallback(
+    (e: React.PointerEvent<HTMLCanvasElement>) => {
+      if (!pointerActiveRef.current) return;
 
-        for (let i = -1; i <= 1; i++) {
-          for (let j = -1; j <= 1; j++) {
-            const nx = x + i;
-            const ny = y + j;
-            if (nx >= 0 && nx < canvasWidth && ny >= 0 && ny < canvasHeight) {
-              simulationRef.current.addDensity(
-                nx + 1,
-                ny + 1,
-                color.r,
-                color.g,
-                color.b,
-              );
-              simulationRef.current.addVelocity(
-                nx + 1,
-                ny + 1,
-                amountX * 0.5,
-                amountY * 0.5,
-              );
+      const simulation = simulationRef.current;
+      const position = getCellPosition(e);
+      if (simulation == null || position == null) return;
+
+      const isTouch = e.pointerType === "touch";
+      const forceScale = isTouch ? 0.8 : 0.5;
+      const neighborFalloff = isTouch ? 0.7 : 0.5;
+      const radius = isTouch ? 2 : 1;
+
+      const forceX = (position.x - prevPosRef.current.x) * forceScale;
+      const forceY = (position.y - prevPosRef.current.y) * forceScale;
+
+      if (
+        position.x >= 0 &&
+        position.x < canvasWidth &&
+        position.y >= 0 &&
+        position.y < canvasHeight
+      ) {
+        const { r, g, b } = colorRef.current;
+        for (let dx = -radius; dx <= radius; dx++) {
+          for (let dy = -radius; dy <= radius; dy++) {
+            const nx = position.x + dx;
+            const ny = position.y + dy;
+            if (nx < 0 || nx >= canvasWidth || ny < 0 || ny >= canvasHeight) {
+              continue;
             }
+            const isCenter = dx === 0 && dy === 0;
+            const strength = isCenter ? 1 : neighborFalloff;
+            simulation.addDensity(nx + 1, ny + 1, r, g, b);
+            simulation.addVelocity(
+              nx + 1,
+              ny + 1,
+              forceX * strength,
+              forceY * strength,
+            );
           }
         }
       }
 
-      setPrevMousePos({ x, y });
+      prevPosRef.current = position;
     },
-    [
-      mouseDown,
-      prevMousePos,
-      canvasScale,
-      canvasWidth,
-      canvasHeight,
-      color.r,
-      color.g,
-      color.b,
-    ],
+    [getCellPosition, canvasWidth, canvasHeight],
   );
 
-  const handleMouseDown = useCallback(
-    (e: React.MouseEvent<HTMLCanvasElement>) => {
-      setMouseDown(true);
-      changeColor();
-      const canvas = canvasRef.current;
-      if (!canvas) return;
-
-      const rect = canvas.getBoundingClientRect();
-      const x = Math.floor((e.clientX - rect.left) / canvasScale);
-      const y = Math.floor((e.clientY - rect.top) / canvasScale);
-      setPrevMousePos({ x, y });
-    },
-    [canvasScale, changeColor],
-  );
-
-  const handleMouseUp = useCallback(() => {
-    setMouseDown(false);
-  }, []);
-
-  const handleTouchStart = useCallback(
-    (e: React.TouchEvent<HTMLCanvasElement>) => {
-      e.preventDefault();
-      setTouchActive(true);
-      changeColor();
-      const canvas = canvasRef.current;
-      if (!canvas) return;
-
-      const rect = canvas.getBoundingClientRect();
-      const touch = e.touches[0];
-      if (!touch) return;
-      const x = Math.floor((touch.clientX - rect.left) / canvasScale);
-      const y = Math.floor((touch.clientY - rect.top) / canvasScale);
-      setPrevMousePos({ x, y });
-    },
-    [canvasScale, changeColor],
-  );
-
-  const handleTouchMove = useCallback(
-    (e: React.TouchEvent<HTMLCanvasElement>) => {
-      e.preventDefault();
-      if (!touchActive || !simulationRef.current) return;
-
-      const canvas = canvasRef.current;
-      if (!canvas) return;
-
-      const rect = canvas.getBoundingClientRect();
-      const touch = e.touches[0];
-      if (!touch) return;
-      const x = Math.floor((touch.clientX - rect.left) / canvasScale);
-      const y = Math.floor((touch.clientY - rect.top) / canvasScale);
-
-      const prevX = prevMousePos.x;
-      const prevY = prevMousePos.y;
-
-      const amountX = (x - prevX) * 0.8;
-      const amountY = (y - prevY) * 0.8;
-
-      if (x >= 0 && x < canvasWidth && y >= 0 && y < canvasHeight) {
-        simulationRef.current.addDensity(
-          x + 1,
-          y + 1,
-          color.r,
-          color.g,
-          color.b,
-        );
-        simulationRef.current.addVelocity(x + 1, y + 1, amountX, amountY);
-
-        for (let dx = -2; dx <= 2; dx++) {
-          for (let dy = -2; dy <= 2; dy++) {
-            const nx = x + dx;
-            const ny = y + dy;
-            if (nx >= 0 && nx < canvasWidth && ny >= 0 && ny < canvasHeight) {
-              simulationRef.current.addDensity(
-                nx + 1,
-                ny + 1,
-                color.r,
-                color.g,
-                color.b,
-              );
-              simulationRef.current.addVelocity(
-                nx + 1,
-                ny + 1,
-                amountX * 0.7,
-                amountY * 0.7,
-              );
-            }
-          }
-        }
-      }
-
-      setPrevMousePos({ x, y });
-    },
-    [
-      touchActive,
-      prevMousePos,
-      canvasScale,
-      canvasWidth,
-      canvasHeight,
-      color.r,
-      color.g,
-      color.b,
-    ],
-  );
-
-  const handleTouchEnd = useCallback(() => {
-    setTouchActive(false);
+  const handlePointerUp = useCallback(() => {
+    pointerActiveRef.current = false;
   }, []);
 
   const toggleSimulation = useCallback(() => {
-    setIsRunning(!isRunning);
-  }, [isRunning]);
+    setIsRunning((running) => !running);
+  }, []);
 
   const clearSimulation = useCallback(() => {
     simulationRef.current?.clear();
@@ -298,31 +255,26 @@ export const FluidCanvas = ({
 
   const updateViscosity = useCallback((value: number) => {
     setViscosity(value);
+    paramsRef.current.viscosity = value;
     simulationRef.current?.setViscosity(value);
   }, []);
 
   const updateDiffusion = useCallback((value: number) => {
     setDiffusion(value);
+    paramsRef.current.diffusion = value;
     simulationRef.current?.setDiffusion(value);
   }, []);
 
-  useEffect(() => {
-    initializeSimulation();
-  }, [initializeSimulation]);
-
   return (
-    <motion.div
-      className="flex flex-col items-center space-y-4"
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5 }}
-    >
-      <motion.canvas
+    <div className="animate-fade-in-up flex flex-col items-center space-y-4">
+      <canvas
         ref={canvasRef}
         width={canvasWidth * canvasScale}
         height={canvasHeight * canvasScale}
+        role="img"
+        aria-label="Interactive fluid simulation canvas"
         className={clsx(
-          "touch-none rounded-lg border border-gray-300 bg-black",
+          "touch-none rounded-lg border border-gray-300 bg-black transition-transform duration-200 hover:scale-[1.02]",
           isMobile ? "w-full max-w-sm" : "cursor-crosshair",
         )}
         style={{
@@ -330,50 +282,37 @@ export const FluidCanvas = ({
           height: "auto",
           aspectRatio: `${canvasWidth} / ${canvasHeight}`,
         }}
-        onMouseMove={handleMouseMove}
-        onMouseDown={handleMouseDown}
-        onMouseUp={handleMouseUp}
-        onMouseLeave={handleMouseUp}
-        onTouchStart={handleTouchStart}
-        onTouchMove={handleTouchMove}
-        onTouchEnd={handleTouchEnd}
-        onTouchCancel={handleTouchEnd}
-        whileHover={{ scale: 1.02 }}
-        transition={{ type: "spring", stiffness: 300 }}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onPointerCancel={handlePointerUp}
       />
 
-      <motion.div
+      <div
         className={clsx(
-          "flex flex-wrap items-center justify-center gap-2 sm:gap-4",
+          "animate-fade-in flex flex-wrap items-center justify-center gap-2 [animation-delay:300ms] sm:gap-4",
           isMobile && "text-sm",
         )}
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 0.3, duration: 0.5 }}
       >
-        <motion.button
+        <button
           onClick={toggleSimulation}
           className={clsx(
-            "rounded bg-blue-500 text-white transition-colors hover:bg-blue-600 active:bg-blue-700",
+            "rounded bg-blue-500 text-white transition hover:scale-105 hover:bg-blue-600 active:scale-95 active:bg-blue-700",
             isMobile ? "px-3 py-2 text-sm" : "px-4 py-2",
           )}
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
         >
           {isRunning ? "Pause" : "Play"}
-        </motion.button>
+        </button>
 
-        <motion.button
+        <button
           onClick={clearSimulation}
           className={clsx(
-            "rounded bg-red-500 text-white transition-colors hover:bg-red-600 active:bg-red-700",
+            "rounded bg-red-500 text-white transition hover:scale-105 hover:bg-red-600 active:scale-95 active:bg-red-700",
             isMobile ? "px-3 py-2 text-sm" : "px-4 py-2",
           )}
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
         >
           Clear
-        </motion.button>
+        </button>
 
         <div
           className={clsx(
@@ -426,14 +365,9 @@ export const FluidCanvas = ({
             </span>
           </div>
         </div>
-      </motion.div>
+      </div>
 
-      <motion.div
-        className="max-w-md text-center text-sm text-gray-600"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 0.5, duration: 0.5 }}
-      >
+      <div className="animate-fade-in max-w-md text-center text-sm text-gray-600 [animation-delay:500ms]">
         <p className="mb-2">
           <strong>Desktop:</strong> Click and drag to add fluid and create
           velocity.
@@ -441,7 +375,7 @@ export const FluidCanvas = ({
         <p>
           <strong>Mobile:</strong> Touch and drag for fluid interaction.
         </p>
-      </motion.div>
-    </motion.div>
+      </div>
+    </div>
   );
 };
