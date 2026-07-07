@@ -49,4 +49,7 @@ preview-green for this class.
 - If the failure is in OpenNext (`loadManifest`, `.open-next/*`, worker
   bootstrap): pin `next` to the last known-good version exact (no `^` —
   e.g. `"next": "15.5.20"`) and check the `@opennextjs/cloudflare`
-  release notes / issues for "supports Next vX" before re-attempting.
+  release notes / issues for a fix of the *specific causing symptom*
+  (the crashing manifest / loader / bootstrap path), not just a blanket
+  "supports Next vX" claim — a general support statement can lag the
+  actual fix.
