@@ -1,11 +1,17 @@
 name: CI
 
 on:
+  push:
+    branches: [main]
   pull_request:
 
+permissions:
+  contents: read
+
 concurrency:
-  group: "${{ github.workflow }}-${{ github.ref }}"
-  cancel-in-progress: true
+  group: ${{ github.workflow }}-${{ github.ref }}
+  # Cancelling an in-progress main run would leave that commit with no CI verdict.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   Lint:
@@ -13,15 +19,61 @@ jobs:
     timeout-minutes: 10
 
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./.github/actions/setup
-      - run: pnpm lint
+      - run: pnpm run lint
 
   Test:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: write
 
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./.github/actions/setup
-      - run: pnpm run test
+      - id: test
+        run: pnpm run test:coverage
+      # Keyed on the test step, not the job: a failure before it leaves no report,
+      # and the reader's own error would then bury the real one. `!cancelled()`
+      # is what stops the implicit `success()` from skipping these on red tests.
+      - if: ${{ !cancelled() && (steps.test.outcome == 'success' || steps.test.outcome == 'failure') }}
+        name: Write the coverage report to the job summary
+        uses: davelosert/vitest-coverage-report-action@8b157684c6a6b259b97d45e72b44242865c0f6a5 # v2.12.2
+        with:
+          comment-on: none
+
+  Build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/setup
+      - run: pnpm run build
+
+  E2ETests:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    container:
+      image: mcr.microsoft.com/playwright:v1.62.1-noble
+      # Without --ipc=host chromium can run out of memory and crash.
+      options: --init --ipc=host
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # checkout's own safe.directory lasts only for its step; the `prepare`
+      # script (`hk install`) that `pnpm install` runs needs it too.
+      - run: git config --global --add safe.directory "$(pwd)"
+      - uses: ./.github/actions/setup
+      - name: Assert the image ships the Playwright version we depend on
+        run: |
+          img="$(node -e "process.stdout.write(JSON.parse(require('fs').readFileSync('/ms-playwright/.docker-info', 'utf8')).driverVersion)")"
+          pt="$(node -p "require('@playwright/test/package.json').version")"
+          pw="$(node -p "require('playwright/package.json').version")"
+          if [ "$pt" != "$img" ] || [ "$pw" != "$img" ]; then
+            echo "::error::image ships Playwright $img, but @playwright/test is $pt and playwright is $pw; update this job's container image tag to v$pt"
+            exit 1
+          fi
+      - run: pnpm run test:e2e

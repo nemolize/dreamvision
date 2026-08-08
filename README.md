@@ -1,46 +1,105 @@
 # DreamVision
 
-Interactive real-time 2D fluid dynamics simulation in the browser, based on
-Jos Stam's ["Real-Time Fluid Dynamics for Games"](https://www.dgp.toronto.edu/public_user/stam/reality/Research/pdf/GDC03.pdf)
-(a Navier-Stokes solver), rendered on an HTML canvas.
+Real-time fluid simulation filling the browser viewport, solved entirely on the
+GPU with [WebGPU](https://www.w3.org/TR/webgpu/) compute shaders. Drag anywhere
+to stir the fluid.
 
-Built with [Next.js](https://nextjs.org/) (App Router) + [Tailwind CSS](https://tailwindcss.com/),
-deployed to [Cloudflare Workers](https://workers.cloudflare.com/) via
-[OpenNext](https://opennext.js.org/cloudflare).
+Built with React + Vite and deployed to
+[Cloudflare Workers](https://workers.cloudflare.com/) as static assets.
+
+## Requirements
+
+**WebGPU is required** — there is no WebGL or CPU fallback. On a browser
+without it the page shows a short notice instead of the canvas. This is a
+deliberate choice for an experimental demo: a single code path is worth more
+here than broad reach.
 
 ## Getting Started
 
-Requirements: Node.js and pnpm (versions are pinned in `mise.toml` — run
-`mise install` if you use [mise](https://mise.jdx.dev/)).
+- [mise](https://mise.jdx.dev/) provisions Node.js, pnpm, and `hk` at the
+  versions pinned in `mise.toml`.
 
 ```bash
+mise install
 pnpm install
 pnpm dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) and click / touch-drag on
-the canvas to add fluid.
+`mise install` has to come first: `pnpm install` runs `hk install` in its
+`prepare` script, and without the toolchain on your `PATH` it aborts with
+`hk: command not found`.
+
+## How it works
+
+A [stable-fluids](https://pages.cs.wisc.edu/~chaol/data/cs777/stam-stable_fluids.pdf)
+solver (Stam 1999) runs as five compute passes per frame over storage textures:
+
+1. **advect** — carry velocity along itself
+2. **splat** — inject force and colour under the pointer
+3. **divergence** — measure how much the velocity field compresses
+4. **pressure** — 32 Jacobi sweeps solving for the pressure that cancels it
+5. **gradient subtract** — remove that pressure gradient, leaving a
+   divergence-free field
+
+The dye field then advects along the projected velocity and a fullscreen
+triangle draws it.
+
+Two grids are in play: velocity and pressure run on a coarse grid, dye on a
+finer one, because colour detail is what the eye actually resolves. Both are
+fitted to the viewport's aspect so cells stay square. Tunables live in
+`src/fluid/config.ts`.
+
+Textures are 32-bit float: WebGPU guarantees write-only storage access for
+those formats, while the 16-bit forms need an optional feature. They are not
+filterable in exchange, so the shaders interpolate by hand.
+
+## Project layout
+
+- `src/fluid/` — the simulation: WGSL shaders, the WebGPU pipeline setup
+  (`renderer.ts`), device acquisition (`gpu.ts`), and pointer tracking
+- `src/FluidCanvas.tsx` — the canvas host; owns the animation loop and holds no
+  React state beyond an error message
+- `e2e-tests/` — Playwright specs, including one that drags across the canvas
+  and asserts pixels actually light up
 
 ## Scripts
 
-| Script       | What it does                                       |
-| ------------ | -------------------------------------------------- |
-| `pnpm dev`   | Start the development server                       |
-| `pnpm build` | Production build                                   |
-| `pnpm lint`  | ESLint + type-check + Prettier check (in parallel) |
-| `pnpm fix`   | Auto-fix ESLint and Prettier issues                |
-| `pnpm test`  | Run unit tests (Vitest)                            |
+| Script                   | What it does                                       |
+| ------------------------ | -------------------------------------------------- |
+| `pnpm dev`               | Start the development server                       |
+| `pnpm build`             | Production build                                   |
+| `pnpm preview`           | Serve the production build on the Workers runtime  |
+| `pnpm lint`              | ESLint + type-check + Prettier check (in parallel) |
+| `pnpm fix`               | Auto-fix ESLint and Prettier issues                |
+| `pnpm test`              | Unit tests (Vitest)                                |
+| `pnpm run test:coverage` | Unit tests with coverage                           |
+| `pnpm run test:e2e`      | End-to-end tests (Playwright)                      |
 
-## Project Layout
+### Testing notes
 
-- `src/lib/fluid-simulation.ts` — the fluid solver (pure TypeScript, no DOM);
-  unit-tested in `src/lib/fluid-simulation.test.ts`
-- `src/components/FluidCanvas.tsx` — canvas rendering, pointer interaction,
-  and simulation controls
-- `src/app/` — Next.js App Router pages
+The solver itself has no unit tests: it needs a real GPU adapter, which Node
+has no implementation of. Its coverage comes from the Playwright suite, which
+drives a real drag and asserts the canvas lights up — so a broken shader or
+pipeline fails CI rather than passing silently.
+
+E2E runs against the Vite dev server by default; in CI (and with `E2E_PREVIEW=1`
+locally) it runs against the production build served by the Workers runtime.
+Both servers bind to port `5173`; `PLAYWRIGHT_PORT` moves the dev server, the
+preview server, and the Playwright target together:
+
+```bash
+PLAYWRIGHT_PORT=5187 pnpm run test:e2e
+```
+
+Reading a WebGPU canvas back in a test needs a screenshot — the drawing buffer
+is not preserved, so `drawImage` onto a 2D canvas yields transparent black
+regardless of what was presented.
 
 ## Deployment
 
-Pushes to `main` deploy to Cloudflare Workers via the `Deploy` GitHub Actions
-workflow (OpenNext build + `opennextjs-cloudflare deploy`). Pull requests get
-a preview upload with the version preview URL posted as a sticky PR comment.
+- Push to `main` deploys to production (`wrangler deploy`).
+- Pull requests upload a preview version; the URL is posted as a sticky PR
+  comment. Fork PRs are skipped, since GitHub withholds the secret from them.
+
+Worker configuration lives in `wrangler.json`; the deployable config is
+generated under `dist/` by `@cloudflare/vite-plugin` during `pnpm build`.
