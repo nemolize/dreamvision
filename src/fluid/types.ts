@@ -12,7 +12,7 @@ export interface Pointer {
 export interface FluidRenderer {
   /** Advance and draw one frame. */
   frame: (pointer: Pointer) => void;
-  /** Re-fit the grids and swap-chain to a new canvas size. */
+  /** Re-fit the simulation grids to a new canvas size. */
   resize: (width: number, height: number) => void;
   destroy: () => void;
 }

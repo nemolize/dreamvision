@@ -31,6 +31,6 @@ export const SPLAT_RADIUS = 0.0035;
 /** Scales normalised pointer motion into the velocity written to the field. */
 export const SPLAT_FORCE = 30;
 
-/** Must match the `@workgroup_size` both shaders declare — this value only
- * sizes the host's dispatch, so the two drift apart silently. */
+/** Workgroup edge length; 8x8 = 64 invocations, a safe fit everywhere. The
+ * renderer substitutes it into the shader source, so this is the only copy. */
 export const WORKGROUP_SIZE = 8;

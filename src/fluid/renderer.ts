@@ -12,9 +12,20 @@ import renderShaderSource from "./render.wgsl?raw";
 import simulationShaderSource from "./simulation.wgsl?raw";
 import type { FluidRenderer, Pointer } from "./types";
 
-/** Matches `Uniforms` in `simulation.wgsl`: four vec2f, one vec4f, six f32,
- * which WGSL's alignment rules lay out in 80 bytes. */
-const UNIFORM_FLOATS = 20;
+/** Float index of each `Uniforms` member in `simulation.wgsl` — WGSL aligns
+ * the `vec4f` to 16 bytes, leaving a hole a positional array would misfill. */
+const UNIFORM = {
+  simSize: 0,
+  splatPoint: 2,
+  splatDelta: 4,
+  splatColor: 8,
+  dt: 12,
+  splatRadius: 13,
+  splatActive: 14,
+  aspect: 15,
+} as const;
+
+const UNIFORM_FLOATS = 16;
 const UNIFORM_BYTES = UNIFORM_FLOATS * 4;
 
 const PARAM_BYTES = 16;
@@ -59,16 +70,8 @@ class DoubleBuffer {
     return this.face;
   }
 
-  get writeFace(): 0 | 1 {
-    return this.face === 0 ? 1 : 0;
-  }
-
-  get read(): GPUTextureView {
-    return this.views[this.face];
-  }
-
   swap(): void {
-    this.face = this.writeFace;
+    this.face = this.face === 0 ? 1 : 0;
   }
 
   destroy(): void {
@@ -102,8 +105,13 @@ export const createFluidRenderer = (
   width: number,
   height: number,
 ): FluidRenderer => {
+  // Substituted rather than duplicated: the host's dispatch count and the
+  // shader's workgroup size must agree, and a drift under-simulates in silence.
   const simulationModule = device.createShaderModule({
-    code: simulationShaderSource,
+    code: simulationShaderSource.replaceAll(
+      "WORKGROUP_SIZE",
+      String(WORKGROUP_SIZE),
+    ),
     label: "fluid-simulation",
   });
   const renderModule = device.createShaderModule({
@@ -221,7 +229,7 @@ export const createFluidRenderer = (
   };
 
   /** One bind group per face the source buffer may be on, indexed by that
-   * face — the pressure solve alone would otherwise build 32 per frame. */
+   * face — the pressure solve alone would otherwise build one per sweep. */
   type FacePair = readonly [GPUBindGroup, GPUBindGroup];
 
   interface Resources {
@@ -231,7 +239,7 @@ export const createFluidRenderer = (
     dye: DoubleBuffer;
     pressure: DoubleBuffer;
     divergence: GPUTexture;
-    buffers: readonly GPUBuffer[];
+    paramBuffers: readonly GPUBuffer[];
     advectVelocity: FacePair;
     /** Indexed by velocity face, then dye face: dye advection reads both. */
     advectDye: readonly [FacePair, FacePair];
@@ -390,7 +398,7 @@ export const createFluidRenderer = (
       dye,
       pressure,
       divergence,
-      buffers: [
+      paramBuffers: [
         advectVelocityParams,
         advectDyeParams,
         splatVelocityParams,
@@ -412,7 +420,7 @@ export const createFluidRenderer = (
     current.dye.destroy();
     current.pressure.destroy();
     current.divergence.destroy();
-    for (const buffer of current.buffers) buffer.destroy();
+    for (const buffer of current.paramBuffers) buffer.destroy();
   };
 
   const resize = (canvasWidth: number, canvasHeight: number): void => {
@@ -427,33 +435,16 @@ export const createFluidRenderer = (
     if (current === null) return;
 
     const { simGrid, dyeGrid, velocity, dye, pressure } = current;
-    const aspect = dyeGrid.width / dyeGrid.height;
 
-    uniformData.set(
-      [
-        simGrid.width,
-        simGrid.height,
-        dyeGrid.width,
-        dyeGrid.height,
-        pointer.x,
-        pointer.y,
-        pointer.dx,
-        pointer.dy,
-        pointer.color[0],
-        pointer.color[1],
-        pointer.color[2],
-        1,
-        TIME_STEP,
-        VELOCITY_DISSIPATION,
-        DYE_DISSIPATION,
-        SPLAT_RADIUS,
-        pointer.down ? 1 : 0,
-        aspect,
-        0,
-        0,
-      ],
-      0,
-    );
+    uniformData.set([simGrid.width, simGrid.height], UNIFORM.simSize);
+    uniformData.set([pointer.x, pointer.y], UNIFORM.splatPoint);
+    uniformData.set([pointer.dx, pointer.dy], UNIFORM.splatDelta);
+    uniformData.set(pointer.color, UNIFORM.splatColor);
+    uniformData[UNIFORM.dt] = TIME_STEP;
+    uniformData[UNIFORM.splatRadius] = SPLAT_RADIUS;
+    uniformData[UNIFORM.splatActive] = pointer.down ? 1 : 0;
+    uniformData[UNIFORM.aspect] = dyeGrid.width / dyeGrid.height;
+
     device.queue.writeBuffer(uniformBuffer, 0, uniformData);
 
     const encoder = device.createCommandEncoder();
@@ -481,7 +472,6 @@ export const createFluidRenderer = (
     );
     velocity.swap();
 
-    // 2. Inject the pointer's force and colour.
     run(pipelines.splat, current.splatVelocity[velocity.readFace], simDispatch);
     velocity.swap();
 
@@ -511,7 +501,6 @@ export const createFluidRenderer = (
     );
     velocity.swap();
 
-    // 4. Carry the dye along the projected velocity field.
     run(
       pipelines.advect,
       current.advectDye[velocity.readFace][dye.readFace],

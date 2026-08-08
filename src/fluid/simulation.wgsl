@@ -10,18 +10,13 @@
 
 struct Uniforms {
   simSize: vec2f,      // velocity grid, in cells
-  dyeSize: vec2f,      // dye grid, in cells
   splatPoint: vec2f,   // normalised 0..1, origin top-left
-  splatDelta: vec2f,   // pointer motion, grid units per second
+  splatDelta: vec2f,   // pointer motion, normalised units per second
   splatColor: vec4f,
   dt: f32,
-  velocityDissipation: f32,
-  dyeDissipation: f32,
-  splatRadius: f32,
-  splatActive: f32,    // 1 when the pointer is down, 0 otherwise
+  splatRadius: f32,    // divides squared distance, so a squared length
+  splatActive: f32,    // 1 when there is input to splat, 0 otherwise
   aspect: f32,         // width / height, keeps splats circular
-  _pad0: f32,
-  _pad1: f32,
 }
 
 @group(0) @binding(0) var<uniform> u: Uniforms;
@@ -73,7 +68,7 @@ struct AdvectParams {
 
 /// Semi-Lagrangian advection: trace each cell back along the velocity field
 /// and read what was there a timestep ago.
-@compute @workgroup_size(8, 8)
+@compute @workgroup_size(WORKGROUP_SIZE, WORKGROUP_SIZE)
 fn advect(@builtin(global_invocation_id) gid: vec3u) {
   let size = vec2u(advectParams.gridSize);
   if (gid.x >= size.x || gid.y >= size.y) { return; }
@@ -97,7 +92,7 @@ fn advect(@builtin(global_invocation_id) gid: vec3u) {
 @group(1) @binding(0) var divergenceVelocity: texture_2d<f32>;
 @group(1) @binding(1) var divergenceOutput: texture_storage_2d<r32float, write>;
 
-@compute @workgroup_size(8, 8)
+@compute @workgroup_size(WORKGROUP_SIZE, WORKGROUP_SIZE)
 fn divergence(@builtin(global_invocation_id) gid: vec3u) {
   let size = vec2u(u.simSize);
   if (gid.x >= size.x || gid.y >= size.y) { return; }
@@ -126,7 +121,7 @@ fn divergence(@builtin(global_invocation_id) gid: vec3u) {
 @group(1) @binding(2) var pressureOutput: texture_storage_2d<r32float, write>;
 
 /// One Jacobi sweep of the Poisson equation for pressure.
-@compute @workgroup_size(8, 8)
+@compute @workgroup_size(WORKGROUP_SIZE, WORKGROUP_SIZE)
 fn pressure(@builtin(global_invocation_id) gid: vec3u) {
   let size = vec2u(u.simSize);
   if (gid.x >= size.x || gid.y >= size.y) { return; }
@@ -149,7 +144,7 @@ fn pressure(@builtin(global_invocation_id) gid: vec3u) {
 @group(1) @binding(2) var gradientOutput: texture_storage_2d<rgba32float, write>;
 
 /// Subtract the pressure gradient, leaving a divergence-free velocity field.
-@compute @workgroup_size(8, 8)
+@compute @workgroup_size(WORKGROUP_SIZE, WORKGROUP_SIZE)
 fn gradientSubtract(@builtin(global_invocation_id) gid: vec3u) {
   let size = vec2u(u.simSize);
   if (gid.x >= size.x || gid.y >= size.y) { return; }
@@ -180,7 +175,7 @@ struct SplatParams {
 @group(1) @binding(2) var<uniform> splatParams: SplatParams;
 
 /// Add a gaussian blob of force or colour under the pointer.
-@compute @workgroup_size(8, 8)
+@compute @workgroup_size(WORKGROUP_SIZE, WORKGROUP_SIZE)
 fn splat(@builtin(global_invocation_id) gid: vec3u) {
   let size = vec2u(splatParams.gridSize);
   if (gid.x >= size.x || gid.y >= size.y) { return; }
