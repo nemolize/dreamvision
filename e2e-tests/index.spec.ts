@@ -3,9 +3,8 @@ import { expect, test } from "@playwright/test";
 
 import { isPreviewTarget } from "./target";
 
-/** Drag across the middle of the viewport in steps, so the pointer accumulates
- * motion the way a real drag does — one jump would splat colour but impart
- * almost no velocity. */
+/** Each pass waits a frame: a slow renderer can otherwise swallow the whole
+ * drag in one frame, splatting colour but leaving velocity nearly empty. */
 const stir = async (
   page: Page,
   size: { width: number; height: number },
@@ -13,7 +12,14 @@ const stir = async (
   const midY = size.height / 2;
   await page.mouse.move(size.width * 0.3, midY);
   await page.mouse.down();
-  await page.mouse.move(size.width * 0.7, midY, { steps: 24 });
+
+  for (let pass = 1; pass <= 4; pass++) {
+    await page.mouse.move(size.width * (0.3 + 0.1 * pass), midY, { steps: 6 });
+    await page.evaluate(
+      () => new Promise((resolve) => requestAnimationFrame(resolve)),
+    );
+  }
+
   await page.mouse.up();
 };
 
@@ -113,8 +119,10 @@ test.describe("fluid canvas", () => {
     const viewport = page.viewportSize() ?? { width: 1280, height: 720 };
     await stir(page, viewport);
 
+    // Generous because each poll round is a screenshot, which costs seconds
+    // against CI's software renderer — a tight window would only get one try.
     await expect
-      .poll(() => litFraction(page), { timeout: 10_000 })
+      .poll(() => litFraction(page), { timeout: 60_000 })
       .toBeGreaterThan(0.01);
 
     // The splat pass alone satisfies the check above; only working advection
