@@ -93,6 +93,10 @@ test.describe("fluid canvas", () => {
   test("starts the GPU simulation and paints dye where the pointer drags", async ({
     page,
   }) => {
+    // Each assertion reads the canvas back through a screenshot, which is slow
+    // against CI's software renderer — the default 30s ceiling is not enough.
+    test.setTimeout(120_000);
+
     await page.goto("/");
 
     const canvas = page.getByLabel("Fluid simulation");
