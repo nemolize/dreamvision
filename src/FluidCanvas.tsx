@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 
+import { MAX_STEPS_PER_FRAME, TIME_STEP } from "@/fluid/config";
 import { GpuUnavailableError, initGpu } from "@/fluid/gpu";
 import { PointerTracker } from "@/fluid/pointer";
 import { createFluidRenderer } from "@/fluid/renderer";
@@ -19,6 +20,7 @@ export const FluidCanvas = () => {
 
     const pointer = new PointerTracker();
     let renderer: FluidRenderer | null = null;
+    let gpuDevice: GPUDevice | null = null;
     let frameId = 0;
     let disposed = false;
 
@@ -63,6 +65,15 @@ export const FluidCanvas = () => {
         device.destroy();
         return;
       }
+      gpuDevice = device;
+
+      // A lost device (driver reset, GPU eviction) leaves the loop submitting
+      // to a dead device forever — the canvas would just freeze silently.
+      void device.lost.then((info) => {
+        if (disposed || info.reason === "destroyed") return;
+        cancelAnimationFrame(frameId);
+        setError("The GPU device was lost. Reload to restart the simulation.");
+      });
 
       const { width, height } = resizeCanvas();
       renderer = createFluidRenderer(device, context, format, width, height);
@@ -73,8 +84,27 @@ export const FluidCanvas = () => {
       canvas.addEventListener("pointercancel", onPointerUp);
       observer.observe(canvas);
 
-      const loop = (): void => {
-        renderer?.frame(pointer.consume());
+      let previous = performance.now();
+      let owed = 0;
+
+      const loop = (now: number): void => {
+        owed += (now - previous) / 1000;
+        previous = now;
+
+        const steps = Math.min(
+          Math.floor(owed / TIME_STEP),
+          MAX_STEPS_PER_FRAME,
+        );
+        owed -= steps * TIME_STEP;
+
+        // The pointer's motion belongs to this frame, so only the first step
+        // splats it — replaying it on each catch-up step would multiply the
+        // force by however far behind the loop had fallen.
+        const sample = pointer.consume();
+        for (let step = 0; step < steps; step++) {
+          renderer?.frame(step === 0 ? sample : { ...sample, dx: 0, dy: 0 });
+        }
+
         frameId = requestAnimationFrame(loop);
       };
       frameId = requestAnimationFrame(loop);
@@ -98,6 +128,7 @@ export const FluidCanvas = () => {
       canvas.removeEventListener("pointerup", onPointerUp);
       canvas.removeEventListener("pointercancel", onPointerUp);
       renderer?.destroy();
+      gpuDevice?.destroy();
     };
   }, []);
 

@@ -33,6 +33,9 @@ export class PointerTracker {
   private dx = 0;
   private dy = 0;
   private active = false;
+  /** Motion arrived since the last `consume`, so it is still unsplatted even
+   * if the pointer has been released since. */
+  private pending = false;
   private color = randomColor();
 
   press(x: number, y: number): void {
@@ -50,25 +53,28 @@ export class PointerTracker {
     this.dy += (y - this.y) * SPLAT_FORCE;
     this.x = x;
     this.y = y;
+    this.pending = true;
   }
 
   release(): void {
     this.active = false;
   }
 
-  /** Read the accumulated motion and clear it, so a frame that renders twice
-   * without a pointermove does not apply the same force again. */
+  /** Read the frame's input and clear it. `down` reports whether there is
+   * input to splat, not whether the button is still held: a drag completed
+   * between two frames would otherwise be dropped entirely. */
   consume(): Pointer {
     const sample: Pointer = {
       x: this.x,
       y: this.y,
       dx: this.dx,
       dy: this.dy,
-      down: this.active,
+      down: this.active || this.pending,
       color: this.color,
     };
     this.dx = 0;
     this.dy = 0;
+    this.pending = false;
     return sample;
   }
 }

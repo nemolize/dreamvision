@@ -12,17 +12,15 @@ import renderShaderSource from "./render.wgsl?raw";
 import simulationShaderSource from "./simulation.wgsl?raw";
 import type { FluidRenderer, Pointer } from "./types";
 
-/** Uniform block laid out to match `Uniforms` in `simulation.wgsl`. */
-const UNIFORM_FLOATS = 24;
+/** Matches `Uniforms` in `simulation.wgsl`: four vec2f, one vec4f, six f32,
+ * which WGSL's alignment rules lay out in 80 bytes. */
+const UNIFORM_FLOATS = 20;
 const UNIFORM_BYTES = UNIFORM_FLOATS * 4;
 
-/** Both per-pass parameter blocks are 4 floats; WebGPU's minimum uniform
- * binding size is larger, so they are padded up to it. */
 const PARAM_BYTES = 16;
 
 // 32-bit float: WebGPU guarantees write-only storage access for these, while
-// the 16-bit forms need an optional feature. They are not filterable, so the
-// solver interpolates in the shader rather than through a linear sampler.
+// the 16-bit forms need an optional feature.
 const VELOCITY_FORMAT: GPUTextureFormat = "rgba32float";
 const DYE_FORMAT: GPUTextureFormat = "rgba32float";
 const PRESSURE_FORMAT: GPUTextureFormat = "r32float";
@@ -119,8 +117,6 @@ export const createFluidRenderer = (
   });
   const uniformData = new Float32Array(UNIFORM_FLOATS);
 
-  // --- bind group layouts -------------------------------------------------
-
   const sharedLayout = device.createBindGroupLayout({
     entries: [
       {
@@ -213,8 +209,6 @@ export const createFluidRenderer = (
     primitive: { topology: "triangle-list" },
   });
 
-  // --- per-pass parameter buffers ----------------------------------------
-
   const makeParamBuffer = (values: readonly number[]): GPUBuffer => {
     const buffer = device.createBuffer({
       size: PARAM_BYTES,
@@ -226,10 +220,8 @@ export const createFluidRenderer = (
     return buffer;
   };
 
-  // --- size-dependent resources ------------------------------------------
-
-  /** One bind group per face the source buffer may be on, so the frame loop
-   * allocates nothing — the pressure solve alone runs 32 sweeps. */
+  /** One bind group per face the source buffer may be on, indexed by that
+   * face — the pressure solve alone would otherwise build 32 per frame. */
   type FacePair = readonly [GPUBindGroup, GPUBindGroup];
 
   interface Resources {
@@ -241,7 +233,7 @@ export const createFluidRenderer = (
     divergence: GPUTexture;
     buffers: readonly GPUBuffer[];
     advectVelocity: FacePair;
-    /** Indexed by dye face, then velocity face: dye advection reads both. */
+    /** Indexed by velocity face, then dye face: dye advection reads both. */
     advectDye: readonly [FacePair, FacePair];
     splatVelocity: FacePair;
     splatDye: FacePair;
@@ -429,8 +421,6 @@ export const createFluidRenderer = (
   };
 
   resize(width, height);
-
-  // --- frame --------------------------------------------------------------
 
   const frame = (pointer: Pointer): void => {
     const current = resources;

@@ -84,6 +84,22 @@ describe("PointerTracker", () => {
     expect(sample.dx).toBe(0);
   });
 
+  it("still splats a drag that began and ended between two frames", () => {
+    const tracker = new PointerTracker();
+    tracker.press(0.2, 0.5);
+    tracker.move(0.6, 0.5);
+    tracker.release();
+
+    // The button is already up, but this motion has never been rendered — the
+    // shader keys the splat on `down`, so reporting false would drop it.
+    const sample = tracker.consume();
+    expect(sample.down).toBe(true);
+    expect(sample.dx).toBeCloseTo(0.4 * SPLAT_FORCE, 3);
+
+    // Drained: the next frame must not splat the same motion again.
+    expect(tracker.consume()).toMatchObject({ down: false, dx: 0, dy: 0 });
+  });
+
   it("does not carry motion across a press", () => {
     const tracker = new PointerTracker();
     tracker.press(0.1, 0.1);

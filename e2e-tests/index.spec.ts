@@ -17,31 +17,49 @@ const stir = async (
   await page.mouse.up();
 };
 
-/** Fraction of pixels that are not near-black, read back through a screenshot:
- * a WebGPU canvas does not preserve its drawing buffer, so `drawImage` onto a
- * 2D canvas returns transparent black no matter what was presented. */
-const litFraction = async (page: Page): Promise<number> => {
+/** Read through a screenshot because a WebGPU canvas does not preserve its
+ * drawing buffer: `drawImage` onto a 2D canvas returns transparent black. */
+const sampleCanvas = async (page: Page): Promise<number[]> => {
   const png = await page.getByLabel("Fluid simulation").screenshot();
   const dataUrl = `data:image/png;base64,${png.toString("base64")}`;
 
   return page.evaluate(async (url) => {
     const bitmap = await createImageBitmap(await (await fetch(url)).blob());
+    const width = 64;
+    const height = Math.max(
+      1,
+      Math.round((width * bitmap.height) / bitmap.width),
+    );
     const surface = document.createElement("canvas");
-    surface.width = bitmap.width;
-    surface.height = bitmap.height;
+    surface.width = width;
+    surface.height = height;
     const ctx = surface.getContext("2d");
-    if (ctx === null) return -1;
-    ctx.drawImage(bitmap, 0, 0);
+    if (ctx === null) return [];
+    ctx.drawImage(bitmap, 0, 0, width, height);
 
-    const { data } = ctx.getImageData(0, 0, surface.width, surface.height);
-    let lit = 0;
+    const { data } = ctx.getImageData(0, 0, width, height);
+    const pixels: number[] = [];
     for (let i = 0; i < data.length; i += 4) {
-      if ((data[i] ?? 0) + (data[i + 1] ?? 0) + (data[i + 2] ?? 0) > 24) {
-        lit++;
-      }
+      pixels.push((data[i] ?? 0) + (data[i + 1] ?? 0) + (data[i + 2] ?? 0));
     }
-    return lit / (data.length / 4);
+    return pixels;
   }, dataUrl);
+};
+
+const litFraction = async (page: Page): Promise<number> => {
+  const pixels = await sampleCanvas(page);
+  if (pixels.length === 0) return -1;
+  return pixels.filter((sum) => sum > 24).length / pixels.length;
+};
+
+/** Mean absolute brightness change between two samples, normalised to 0..1. */
+const meanChange = (before: number[], after: number[]): number => {
+  if (before.length === 0 || before.length !== after.length) return -1;
+  const total = before.reduce(
+    (sum, value, i) => sum + Math.abs(value - (after[i] ?? 0)),
+    0,
+  );
+  return total / before.length / 765;
 };
 
 test.describe("fluid canvas", () => {
@@ -94,6 +112,16 @@ test.describe("fluid canvas", () => {
     await expect
       .poll(() => litFraction(page), { timeout: 10_000 })
       .toBeGreaterThan(0.01);
+
+    // The splat pass alone satisfies the check above; only working advection
+    // keeps the picture changing once the pointer is up.
+    const changeBetweenFrames = async (): Promise<number> => {
+      const before = await sampleCanvas(page);
+      const after = await sampleCanvas(page);
+      return meanChange(before, after);
+    };
+
+    expect(await changeBetweenFrames()).toBeGreaterThan(0.002);
   });
 
   test("serves the SPA shell for a deep route with no file on disk", async ({
