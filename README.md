@@ -37,12 +37,17 @@ solver (Stam 1999) runs as five compute passes per frame over storage textures:
 1. **advect** — carry velocity along itself
 2. **splat** — inject force and colour under the pointer
 3. **divergence** — measure how much the velocity field compresses
-4. **pressure** — 32 Jacobi sweeps solving for the pressure that cancels it
+4. **pressure** — Jacobi sweeps solving for the pressure that cancels it
 5. **gradient subtract** — remove that pressure gradient, leaving a
    divergence-free field
 
 The dye field then advects along the projected velocity and a fullscreen
 triangle draws it.
+
+The solver advances by a fixed timestep while the frame loop accumulates real
+elapsed time, so the fluid behaves the same on a 60Hz and a 120Hz display; a
+long stall is capped rather than replayed. If the GPU device is lost, the
+canvas is replaced by a notice instead of freezing in place.
 
 Two grids are in play: velocity and pressure run on a coarse grid, dye on a
 finer one, because colour detail is what the eye actually resolves. Both are
@@ -52,6 +57,11 @@ fitted to the viewport's aspect so cells stay square. Tunables live in
 Textures are 32-bit float: WebGPU guarantees write-only storage access for
 those formats, while the 16-bit forms need an optional feature. They are not
 filterable in exchange, so the shaders interpolate by hand.
+
+Two known deviations from a textbook solver — an anisotropic projection on
+non-square viewports, and divergence/pressure stencils that do not match — are
+tracked in [#681](https://github.com/nemolize/dreamvision/issues/681). Neither
+breaks the simulation; they affect how it feels.
 
 ## Project layout
 
@@ -79,8 +89,12 @@ filterable in exchange, so the shaders interpolate by hand.
 
 The solver itself has no unit tests: it needs a real GPU adapter, which Node
 has no implementation of. Its coverage comes from the Playwright suite, which
-drives a real drag and asserts the canvas lights up — so a broken shader or
-pipeline fails CI rather than passing silently.
+drives a real drag and then asserts the picture keeps changing after the
+pointer is released. That second assertion is the load-bearing one: lit pixels
+alone prove nothing, since the splat pass writes colour straight under the
+drag path — only advection over a projected velocity field keeps the field
+moving with no further input. Verified by disabling advection and confirming
+the suite fails.
 
 E2E runs against the Vite dev server by default; in CI (and with `E2E_PREVIEW=1`
 locally) it runs against the production build served by the Workers runtime.
