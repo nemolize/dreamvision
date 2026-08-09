@@ -20,7 +20,7 @@
     "test": "vitest run --passWithNoTests",
     "test:coverage": "vitest run --coverage --passWithNoTests",
     "test:e2e": "playwright test",
-    "prepare": "hk install"
+    "prepare": "mise exec -- hk install --mise"
   },
   "dependencies": {
     "react": "^19.2.5",
