@@ -1,66 +1,58 @@
 name: Deploy
 
+# Deliberately not gated on CI: shipping while CI is red has to stay possible.
 on:
   push:
     branches: [main]
   workflow_dispatch:
   pull_request:
 
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  # Queue production deploys so a rapid second push cannot cancel an
-  # in-flight deploy; preview uploads are safe to supersede.
-  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
-
 permissions:
   contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  # Queueing production keeps a second push from cancelling a live deploy.
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   Deploy:
     runs-on: ubuntu-24.04
     timeout-minutes: 20
-    # `pull-requests: write` is needed only by the sticky-comment steps, which
-    # are themselves gated on `github.event_name == 'pull_request'`.
     permissions:
       contents: read
       pull-requests: write
+    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
+    environment:
+      name: ${{ github.ref == 'refs/heads/main' && 'production' || 'preview' }}
+      url: ${{ steps.deploy.outputs.deployment-url }}
     steps:
-      - uses: marocchino/sticky-pull-request-comment@v2
+      - if: ${{ github.event_name == 'pull_request' }}
+        name: Show wip message in sticky comment
+        uses: marocchino/sticky-pull-request-comment@5770ad5eb8f42dd2c4f34da00c94c5381e49af88 # v3.0.5
         with:
           message: "Version Preview URL: ⏳deployment is in progress..."
 
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./.github/actions/setup
 
-      - name: Restore build cache
-        uses: actions/cache@v6
-        with:
-          path: ${{ github.workspace }}/.next/cache
-          key: ${{ runner.os }}-nextjs-${{ hashFiles('**/pnpm-lock.yaml') }}-${{ hashFiles('**/*.js', '**/*.jsx', '**/*.ts', '**/*.tsx', '!node_modules/**/*') }}
-          restore-keys: |
-            ${{ runner.os }}-nextjs-${{ hashFiles('**/pnpm-lock.yaml') }}-
-            ${{ runner.os }}-nextjs-
-
-      - uses: nemolize/set-wrangler-name@v1
-      - run: pnpm exec opennextjs-cloudflare build
+      - run: pnpm run build
 
       - id: deploy
         name: Deploy
-        run: |
-          OUTPUT=$(pnpm exec opennextjs-cloudflare ${{ github.event_name == 'pull_request' && 'upload' || 'deploy' }})
-          echo "$OUTPUT"
-          echo "preview_line=$(echo "$OUTPUT" | grep "Version Preview URL:")" >> $GITHUB_OUTPUT
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-
-      - name: Add preview URL comment
-        if: github.event_name == 'pull_request'
-        uses: marocchino/sticky-pull-request-comment@v2
+        uses: cloudflare/wrangler-action@ebbaa1584979971c8614a24965b4405ff95890e0 # v4.0.0
         with:
-          message: ${{ steps.deploy.outputs.preview_line }}
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          command: ${{ github.ref == 'refs/heads/main' && 'deploy' || 'versions upload' }}
 
-      - if: failure()
+      - if: ${{ github.event_name == 'pull_request' }}
+        name: Show version preview URL in sticky comment
+        uses: marocchino/sticky-pull-request-comment@5770ad5eb8f42dd2c4f34da00c94c5381e49af88 # v3.0.5
+        with:
+          message: "Version Preview URL: ${{ steps.deploy.outputs.deployment-url || '⚠️ no URL returned — is the workers.dev subdomain enabled?' }}"
+
+      - if: ${{ failure() && github.event_name == 'pull_request' }}
         name: Show error message in sticky comment
-        uses: marocchino/sticky-pull-request-comment@v2
+        uses: marocchino/sticky-pull-request-comment@5770ad5eb8f42dd2c4f34da00c94c5381e49af88 # v3.0.5
         with:
           message: "Version Preview URL: ❌deployment failed."

@@ -4,6 +4,16 @@ description: "Setup Node.js environment, pnpm, cache, and install dependencies"
 runs:
   using: "composite"
   steps:
-    - uses: jdx/mise-action@v3
+    - uses: jdx/mise-action@7e36c90d9ab29c415a2384db3006f3ec8a8cc654 # v4.2.4
+    - id: store
+      run: echo "path=$(pnpm store path)" >> "$GITHUB_OUTPUT"
+      shell: bash
+    - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ${{ steps.store.outputs.path }}
+        # The store path is in the key because container jobs resolve a different
+        # $HOME than host jobs, and one's cache is useless in the other.
+        key: pnpm-store-${{ runner.os }}-${{ steps.store.outputs.path }}-${{ hashFiles('pnpm-lock.yaml', 'mise.toml') }}
+        restore-keys: pnpm-store-${{ runner.os }}-${{ steps.store.outputs.path }}-
     - run: pnpm install --frozen-lockfile
       shell: bash

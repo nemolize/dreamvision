@@ -1,7 +1,3 @@
-onlyBuiltDependencies:
-  - esbuild
-  - lefthook
-  - rclone.js
-  - sharp
-  - unrs-resolver
-  - workerd
+allowBuilds:
+  esbuild: true
+  workerd: true
