@@ -11,7 +11,7 @@
 struct Uniforms {
   simSize: vec2f,      // velocity grid, in cells
   splatPoint: vec2f,   // normalised 0..1, origin top-left
-  splatDelta: vec2f,   // pointer motion, normalised units per second
+  splatDelta: vec2f,   // pointer travel since the last frame, times SPLAT_FORCE
   splatColor: vec4f,
   dt: f32,
   splatRadius: f32,    // divides squared distance, so a squared length
@@ -48,14 +48,14 @@ fn sampleAt(tex: texture_2d<f32>, size: vec2f, cell: vec2f) -> vec4f {
   return mix(mix(c00, c10, frac.x), mix(c01, c11, frac.x), frac.y);
 }
 
-/// Free-slip walls: the boundary cell mirrors its inward neighbour with the
-/// normal component negated, so fluid slides along the edge instead of
-/// leaking through it.
-fn velocityBoundaryScale(id: vec2u, size: vec2u) -> vec2f {
-  var scale = vec2f(1.0, 1.0);
-  if (id.x == 0u || id.x == size.x - 1u) { scale.x = -1.0; }
-  if (id.y == 0u || id.y == size.y - 1u) { scale.y = -1.0; }
-  return scale;
+/// Free-slip walls: no flow crosses the edge, so the component normal to it is
+/// dropped while the tangential one slides along untouched. Negating the normal
+/// component instead would keep its magnitude and merely reverse the leak.
+fn applyVelocityBoundary(velocity: vec2f, id: vec2u, size: vec2u) -> vec2f {
+  var bounded = velocity;
+  if (id.x == 0u || id.x == size.x - 1u) { bounded.x = 0.0; }
+  if (id.y == 0u || id.y == size.y - 1u) { bounded.y = 0.0; }
+  return bounded;
 }
 
 // ---------------------------------------------------------------- advection
@@ -170,7 +170,7 @@ fn gradientSubtract(@builtin(global_invocation_id) gid: vec3u) {
   let velocity = sampleAt(gradientVelocity, u.simSize, cell).xy;
   let gradient = 0.5 * u.differenceScale * vec2f(right - left, up - down);
   let projected = velocity - gradient;
-  let bounded = projected * velocityBoundaryScale(gid.xy, size);
+  let bounded = applyVelocityBoundary(projected, gid.xy, size);
 
   textureStore(gradientOutput, gid.xy, vec4f(bounded, 0.0, 1.0));
 }

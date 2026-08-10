@@ -2,7 +2,9 @@ export interface Pointer {
   /** Normalised position, origin top-left. */
   x: number;
   y: number;
-  /** Motion since the previous frame, in normalised units per second. */
+  /** Normalised travel accumulated since the last frame, scaled by
+   * `SPLAT_FORCE`. Not a rate: it is never divided by elapsed time, so a given
+   * drag deposits the same impulse however long the frame took. */
   dx: number;
   dy: number;
   down: boolean;

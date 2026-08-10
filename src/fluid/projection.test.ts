@@ -108,6 +108,24 @@ const gradient = (p: Field): Velocity => {
   return out;
 };
 
+/**
+ * `applyVelocityBoundary`: free-slip walls drop the component normal to the
+ * edge and leave the tangential one alone.
+ */
+const applyWalls = (u: Velocity): Velocity => {
+  const { width, height } = u.x;
+  const out = velocity(width, height);
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const onVerticalWall = x === 0 || x === width - 1;
+      const onHorizontalWall = y === 0 || y === height - 1;
+      set(out.x, x, y, onVerticalWall ? 0 : at(u.x, x, y));
+      set(out.y, x, y, onHorizontalWall ? 0 : at(u.y, x, y));
+    }
+  }
+  return out;
+};
+
 /** The Laplacian the Jacobi sweep inverts, written out as an operator. */
 const laplacian = (p: Field): Field => {
   const { width, height } = p;
@@ -373,16 +391,30 @@ describe("the Jacobi sweep", () => {
 });
 
 describe("the projection as a whole", () => {
+  /** The whole `gradientSubtract` pass, walls included. */
   const project = (u: Velocity, sweeps: number): Velocity => {
     const p = solvePressure(divergence(u), sweeps);
     const g = gradient(p);
-    const out = velocity(u.x.width, u.x.height);
+    const subtracted = velocity(u.x.width, u.x.height);
     fillVelocity(
-      out,
+      subtracted,
       (x, y) => at(u.x, x, y) - at(g.x, x, y),
       (x, y) => at(u.y, x, y) - at(g.y, x, y),
     );
-    return out;
+    return applyWalls(subtracted);
+  };
+
+  /** Net flow out through the four walls; a closed box must have none. */
+  const wallFlux = (u: Velocity): number => {
+    const { width, height } = u.x;
+    let flux = 0;
+    for (let y = 0; y < height; y++) {
+      flux += at(u.x, width - 1, y) - at(u.x, 0, y);
+    }
+    for (let x = 0; x < width; x++) {
+      flux += at(u.y, x, height - 1) - at(u.y, x, 0);
+    }
+    return flux;
   };
 
   it("reduces the divergence of a compressible flow", () => {
@@ -396,6 +428,38 @@ describe("the projection as a whole", () => {
     const before = l2Interior(divergence(u));
     const after = l2Interior(divergence(project(u, 256)));
     expect(after).toBeLessThan(before);
+  });
+
+  it("lets no net flow through the walls", () => {
+    // The box is closed, so whatever the interior does, the four edges must
+    // carry nothing across. Negating the normal component — which is what the
+    // pass did before — preserves its magnitude and only reverses the leak,
+    // leaving this sum as large as it started.
+    const u = velocity(64, 36);
+    fillVelocity(
+      u,
+      (x, y) => Math.sin(x * 0.08) * Math.cos(y * 0.06),
+      (x, y) => Math.cos(x * 0.05) * Math.sin(y * 0.09),
+    );
+
+    expect(Math.abs(wallFlux(project(u, 256)))).toBeCloseTo(0, 12);
+  });
+
+  it("leaves a flow sliding along a wall alone", () => {
+    // Free-slip: the tangential component is not the projection's business, so
+    // a flow parallel to an edge must survive the wall treatment untouched.
+    const u = velocity(24, 14);
+    fillVelocity(
+      u,
+      () => 0,
+      () => 1,
+    );
+
+    const walled = applyWalls(u);
+    // Down the left edge, `vy` is tangential and must be preserved...
+    expect(at(walled.y, 0, 7)).toBe(1);
+    // ...while on the top edge the same component is normal, and goes.
+    expect(at(walled.y, 12, 0)).toBe(0);
   });
 
   it("treats a flow and its quarter-turn rotation alike on a square grid", () => {
