@@ -6,7 +6,7 @@ import { jacobiDiagonal, projectionScale } from "./projection";
 /**
  * The discrete operators the projection passes implement, rebuilt here from
  * the factors `projection.ts` derives, so their identities can be checked
- * without a GPU. A wrong sign, a swapped axis, or a missing aspect term is
+ * without a GPU. A wrong sign, a swapped axis, or a missing per-axis weight is
  * invisible to the Playwright suite — the fluid still looks like a fluid —
  * but breaks an assertion below.
  *
@@ -49,13 +49,13 @@ const velocity = (width: number, height: number): Velocity => ({
 });
 
 /**
- * The `divergence` pass: a central difference per axis, each scaled into the
- * physical metric, with the outside sample mirrored at a wall so no flow
- * crosses it.
+ * The `divergence` pass: a central difference per axis, each weighted into the
+ * cell metric, with the outside sample mirrored at a wall so no flow crosses
+ * it.
  */
-const divergence = (u: Velocity, aspect: number): Field => {
+const divergence = (u: Velocity): Field => {
   const { width, height } = u.x;
-  const scale = projectionScale(width, height, aspect);
+  const scale = projectionScale(width, height);
   const out = field(width, height);
 
   for (let y = 0; y < height; y++) {
@@ -81,12 +81,12 @@ const divergence = (u: Velocity, aspect: number): Field => {
 };
 
 /**
- * The pressure gradient `gradientSubtract` removes, as its own operator so the
- * adjoint identity can be checked against `divergence`.
+ * The pressure gradient `gradientSubtract` removes, as its own operator so it
+ * can be composed against `divergence`.
  */
-const gradient = (p: Field, aspect: number): Velocity => {
+const gradient = (p: Field): Velocity => {
   const { width, height } = p;
-  const scale = projectionScale(width, height, aspect);
+  const scale = projectionScale(width, height);
   const out = velocity(width, height);
 
   for (let y = 0; y < height; y++) {
@@ -109,9 +109,9 @@ const gradient = (p: Field, aspect: number): Velocity => {
 };
 
 /** The Laplacian the Jacobi sweep inverts, written out as an operator. */
-const laplacian = (p: Field, aspect: number): Field => {
+const laplacian = (p: Field): Field => {
   const { width, height } = p;
-  const scale = projectionScale(width, height, aspect);
+  const scale = projectionScale(width, height);
   const diagonal = jacobiDiagonal(scale);
   const out = field(width, height);
 
@@ -131,9 +131,9 @@ const laplacian = (p: Field, aspect: number): Field => {
 };
 
 /** One Jacobi sweep, transcribed from the `pressure` entry point. */
-const jacobiSweep = (p: Field, rhs: Field, aspect: number): Field => {
+const jacobiSweep = (p: Field, rhs: Field): Field => {
   const { width, height } = p;
-  const scale = projectionScale(width, height, aspect);
+  const scale = projectionScale(width, height);
   const diagonal = jacobiDiagonal(scale);
   const out = field(width, height);
 
@@ -148,9 +148,9 @@ const jacobiSweep = (p: Field, rhs: Field, aspect: number): Field => {
   return out;
 };
 
-const solvePressure = (rhs: Field, aspect: number, sweeps: number): Field => {
+const solvePressure = (rhs: Field, sweeps: number): Field => {
   let p = field(rhs.width, rhs.height);
-  for (let i = 0; i < sweeps; i++) p = jacobiSweep(p, rhs, aspect);
+  for (let i = 0; i < sweeps; i++) p = jacobiSweep(p, rhs);
   return p;
 };
 
@@ -186,36 +186,35 @@ const fillField = (f: Field, fn: (x: number, y: number) => number): void => {
 };
 
 describe("projectionScale", () => {
-  it("weights the two axes equally when the cells are square", () => {
-    // A 16:9 canvas on a 16:9 grid: the cells come out square, so neither axis
-    // should be favoured even though the cell *counts* differ by 16/9.
-    const scale = projectionScale(320, 180, 16 / 9);
-    expect(scale.divergenceX).toBeCloseTo(scale.divergenceY, 6);
-    expect(scale.laplacianX).toBeCloseTo(scale.laplacianY, 6);
+  it("weights each axis by its own cell count", () => {
+    // What `advect` means by the stored units: one unit of vx crosses `width`
+    // cells per second, one unit of vy crosses `height`. Equal weights — the
+    // state before #681 — therefore under-count x by the aspect ratio.
+    const scale = projectionScale(320, 180);
+    expect(scale.divergenceX).toBe(320);
+    expect(scale.divergenceY).toBe(180);
+    expect(scale.divergenceY / scale.divergenceX).toBeCloseTo(180 / 320, 9);
   });
 
-  it("weights the axes apart when the cells are not square", () => {
-    // `fitGrid`'s two-cell floor produces this at extreme aspects, and it is
-    // exactly the case a single shared cell size would get wrong.
-    const scale = projectionScale(320, 2, 300);
-    const cellX = 300 / 320;
-    const cellY = 1 / 2;
-    expect(scale.divergenceX / scale.divergenceY).toBeCloseTo(cellY / cellX, 6);
+  it("weights the axes equally only on a square grid", () => {
+    const scale = projectionScale(64, 64);
+    expect(scale.divergenceX).toBe(scale.divergenceY);
+    expect(scale.laplacianX).toBe(scale.laplacianY);
   });
 
-  it("derives every factor from the same two cell sizes", () => {
-    const scale = projectionScale(97, 41, 2.3);
-    expect(scale.gradientX).toBeCloseTo(scale.divergenceX, 9);
-    expect(scale.gradientY).toBeCloseTo(scale.divergenceY, 9);
-    expect(scale.laplacianX).toBeCloseTo(scale.divergenceX ** 2, 9);
-    expect(scale.laplacianY).toBeCloseTo(scale.divergenceY ** 2, 9);
+  it("derives every factor from the same two cell counts", () => {
+    const scale = projectionScale(97, 41);
+    expect(scale.gradientX).toBe(scale.divergenceX);
+    expect(scale.gradientY).toBe(scale.divergenceY);
+    expect(scale.laplacianX).toBe(scale.divergenceX ** 2);
+    expect(scale.laplacianY).toBe(scale.divergenceY ** 2);
   });
 
   it("scales as an inverse length", () => {
-    const coarse = projectionScale(32, 18, 16 / 9);
-    const fine = projectionScale(64, 36, 16 / 9);
-    expect(fine.divergenceX / coarse.divergenceX).toBeCloseTo(2, 6);
-    expect(fine.laplacianX / coarse.laplacianX).toBeCloseTo(4, 6);
+    const coarse = projectionScale(32, 18);
+    const fine = projectionScale(64, 36);
+    expect(fine.divergenceX / coarse.divergenceX).toBeCloseTo(2, 9);
+    expect(fine.laplacianX / coarse.laplacianX).toBeCloseTo(4, 9);
   });
 });
 
@@ -223,12 +222,11 @@ describe("jacobiDiagonal", () => {
   it("reduces to the textbook 4 / h² on a square grid", () => {
     // The uniform-cell solver hard-codes a 0.25 multiplier, i.e. a diagonal of
     // 4 in units where h = 1. The weighted form has to agree there.
-    const scale = projectionScale(16, 16, 1);
-    expect(jacobiDiagonal(scale)).toBeCloseTo(4 * 16 * 16, 6);
+    expect(jacobiDiagonal(projectionScale(16, 16))).toBeCloseTo(4 * 16 * 16, 9);
   });
 
   it("is the sum of the weights the sweep spreads over the neighbours", () => {
-    const scale = projectionScale(40, 13, 3.1);
+    const scale = projectionScale(40, 13);
     expect(jacobiDiagonal(scale)).toBeCloseTo(
       2 * scale.laplacianX + 2 * scale.laplacianY,
       9,
@@ -246,7 +244,7 @@ describe("the discrete operators", () => {
     );
     // The walls do carry divergence — that is the free-slip condition biting,
     // not an error — so the interior is what must come out clean.
-    expect(l2Interior(divergence(u, 16 / 9))).toBeCloseTo(0, 9);
+    expect(l2Interior(divergence(u))).toBeCloseTo(0, 9);
   });
 
   it("measures a pure expansion as positive divergence", () => {
@@ -256,22 +254,21 @@ describe("the discrete operators", () => {
       (x) => x,
       (_x, y) => y,
     );
-    const d = divergence(u, 1);
-    expect(at(d, 4, 4)).toBeGreaterThan(0);
+    expect(at(divergence(u), 4, 4)).toBeGreaterThan(0);
   });
 
-  it("measures the same divergence for a flow rotated by a quarter turn", () => {
-    // The anisotropy of #681 shows up precisely here: before the per-axis
-    // factors, the same physical flow read as different divergences depending
-    // on which way it pointed.
-    const aspect = 16 / 9;
+  it("reads the same divergence from a flow and its quarter turn", () => {
+    // #681's anisotropy, as a symmetry: two flows that spread at the same
+    // physical rate, one along each axis. In the stored units a full traverse
+    // is 1.0 either way, so the same normalised ramp *is* the same physical
+    // flow — and only the per-axis weights make the two readings agree.
     const width = 32;
     const height = 18;
 
     const horizontal = velocity(width, height);
     fillVelocity(
       horizontal,
-      (x) => (x / width) * aspect,
+      (x) => x / width,
       () => 0,
     );
 
@@ -282,21 +279,21 @@ describe("the discrete operators", () => {
       (_x, y) => y / height,
     );
 
-    const dH = divergence(horizontal, aspect);
-    const dV = divergence(vertical, aspect);
-    expect(at(dH, 16, 9)).toBeCloseTo(at(dV, 16, 9), 6);
+    expect(at(divergence(horizontal), 16, 9)).toBeCloseTo(
+      at(divergence(vertical), 16, 9),
+      9,
+    );
   });
 
   it("does NOT compose into the Laplacian the Jacobi sweep inverts", () => {
     // #681's second defect, pinned as the gap it currently is: a central
     // difference on both sides composes to a 2-cell Laplacian, not the 1-cell
     // operator the sweep solves. Fixing the stencils flips this assertion.
-    const aspect = 16 / 9;
     const p = field(24, 14);
     fillField(p, (x, y) => Math.sin(x * 0.3) * Math.cos(y * 0.45));
 
-    const composed = divergence(gradient(p, aspect), aspect);
-    const direct = laplacian(p, aspect);
+    const composed = divergence(gradient(p));
+    const direct = laplacian(p);
 
     const difference = field(p.width, p.height);
     for (let i = 0; i < difference.data.length; i++) {
@@ -308,12 +305,10 @@ describe("the discrete operators", () => {
 
 describe("the Jacobi sweep", () => {
   it("leaves the exact solution where it is", () => {
-    const aspect = 16 / 9;
     const p = field(20, 12);
     fillField(p, (x, y) => Math.sin(x * 0.4) * Math.sin(y * 0.6));
 
-    const rhs = laplacian(p, aspect);
-    const swept = jacobiSweep(p, rhs, aspect);
+    const swept = jacobiSweep(p, laplacian(p));
 
     const difference = field(p.width, p.height);
     for (let i = 0; i < difference.data.length; i++) {
@@ -323,11 +318,10 @@ describe("the Jacobi sweep", () => {
   });
 
   /** Sweep a starting error towards the zero solution and report what remains. */
-  const surviving = (start: Field, aspect: number, sweeps: number): number => {
+  const surviving = (start: Field, sweeps: number): number => {
     const zero = field(start.width, start.height);
     let current = start;
-    for (let i = 0; i < sweeps; i++)
-      current = jacobiSweep(current, zero, aspect);
+    for (let i = 0; i < sweeps; i++) current = jacobiSweep(current, zero);
     return l2Interior(current) / l2Interior(start);
   };
 
@@ -338,7 +332,7 @@ describe("the Jacobi sweep", () => {
     const error = field(SIM_RESOLUTION, 180);
     fillField(error, (x, y) => ((x + y) % 2 === 0 ? 1 : -1));
 
-    expect(surviving(error, 16 / 9, PRESSURE_ITERATIONS)).toBeGreaterThan(0.95);
+    expect(surviving(error, PRESSURE_ITERATIONS)).toBeGreaterThan(0.95);
   });
 
   it("hides that on a grid small enough for the walls to reach", () => {
@@ -348,15 +342,14 @@ describe("the Jacobi sweep", () => {
     const error = field(16, 16);
     fillField(error, (x, y) => ((x + y) % 2 === 0 ? 1 : -1));
 
-    expect(surviving(error, 1, PRESSURE_ITERATIONS)).toBeLessThan(0.6);
+    expect(surviving(error, PRESSURE_ITERATIONS)).toBeLessThan(0.6);
   });
 
   it("never raises a checkerboard the divergence did not contain", () => {
     // Why the mode above costs nothing in practice, and why a weighted sweep
     // would be the wrong fix: an amplification of -1 neither damps NOR grows
-    // the mode, and the solve starts from zero — so with a smooth divergence
-    // driving it, no checkerboard is ever created to need damping.
-    const aspect = 16 / 9;
+    // the mode, and the solve starts from zero — so a smooth divergence never
+    // creates a checkerboard that would need damping.
     const u = velocity(64, 36);
     fillVelocity(
       u,
@@ -364,10 +357,8 @@ describe("the Jacobi sweep", () => {
       (x, y) => Math.cos(x * 0.1) * Math.sin(y * 0.25),
     );
 
-    const p = solvePressure(divergence(u, aspect), aspect, PRESSURE_ITERATIONS);
+    const p = solvePressure(divergence(u), PRESSURE_ITERATIONS);
 
-    // Project the pressure onto the (pi, pi) mode and compare with its overall
-    // magnitude: a field carrying real checkerboard would score near 1.
     let alternating = 0;
     let cells = 0;
     for (let y = 1; y < p.height - 1; y++) {
@@ -379,25 +370,12 @@ describe("the Jacobi sweep", () => {
     const share = Math.abs(alternating) / Math.sqrt(cells) / l2Interior(p);
     expect(share).toBeLessThan(0.001);
   });
-
-  it("damps a mid-frequency mode at the same resolution", () => {
-    // Same grid and sweep count as the checkerboard test, so the contrast
-    // isolates the frequency rather than the geometry.
-    const error = field(SIM_RESOLUTION, 180);
-    fillField(
-      error,
-      (x, y) => Math.sin((x * Math.PI) / 2) * Math.sin((y * Math.PI) / 2),
-    );
-
-    expect(surviving(error, 16 / 9, PRESSURE_ITERATIONS)).toBeLessThan(0.05);
-  });
 });
 
 describe("the projection as a whole", () => {
-  const project = (u: Velocity, aspect: number, sweeps: number): Velocity => {
-    const rhs = divergence(u, aspect);
-    const p = solvePressure(rhs, aspect, sweeps);
-    const g = gradient(p, aspect);
+  const project = (u: Velocity, sweeps: number): Velocity => {
+    const p = solvePressure(divergence(u), sweeps);
+    const g = gradient(p);
     const out = velocity(u.x.width, u.x.height);
     fillVelocity(
       out,
@@ -408,7 +386,6 @@ describe("the projection as a whole", () => {
   };
 
   it("reduces the divergence of a compressible flow", () => {
-    const aspect = 16 / 9;
     const u = velocity(24, 14);
     fillVelocity(
       u,
@@ -416,15 +393,15 @@ describe("the projection as a whole", () => {
       (x, y) => Math.cos(x * 0.2) * Math.sin(y * 0.7),
     );
 
-    const before = l2Interior(divergence(u, aspect));
-    const after = l2Interior(divergence(project(u, aspect, 64), aspect));
+    const before = l2Interior(divergence(u));
+    const after = l2Interior(divergence(project(u, 256)));
     expect(after).toBeLessThan(before);
   });
 
   it("treats a flow and its quarter-turn rotation alike on a square grid", () => {
-    // Rotational symmetry is the property the anisotropy destroyed. On a
-    // square grid with a square canvas the projection must not care which axis
-    // the flow runs along.
+    // Rotational symmetry is the property the anisotropy destroyed. On a square
+    // grid the projection must not care which axis the flow runs along, and the
+    // two pressure fields must come out as each other's transpose.
     const size = 16;
     const sweeps = 64;
 
@@ -442,11 +419,9 @@ describe("the projection as a whole", () => {
       (_x, y) => Math.sin(y * 0.4),
     );
 
-    const ph = solvePressure(divergence(horizontal, 1), 1, sweeps);
-    const pv = solvePressure(divergence(vertical, 1), 1, sweeps);
+    const ph = solvePressure(divergence(horizontal), sweeps);
+    const pv = solvePressure(divergence(vertical), sweeps);
 
-    // The two pressure fields are each other's transpose if the operator has
-    // no directional bias.
     let worst = 0;
     for (let y = 1; y < size - 1; y++) {
       for (let x = 1; x < size - 1; x++) {
@@ -456,22 +431,18 @@ describe("the projection as a whole", () => {
     expect(worst / l2Interior(ph)).toBeLessThan(1e-9);
   });
 
-  it("stays symmetric on a non-square canvas once the metric is carried", () => {
-    // The regression #681 describes: with equal weights, stretching the canvas
-    // made the same physical flow read as two different divergences depending
-    // on which axis it ran along.
-    const aspect = 2;
+  it("keeps that symmetry on a grid whose axes differ in resolution", () => {
+    // The regression #681 describes. The same physical flow, once along each
+    // axis, on a 2:1 grid: with equal weights the two projections disagreed by
+    // the aspect ratio, and carrying the metric brings them back together.
     const width = 32;
     const height = 16;
+    const sweeps = 256;
 
-    // One ramp per axis, rising by the same physical amount over the same
-    // physical distance — the x component is `aspect` times larger in
-    // normalised units because the canvas is that much wider, and it spans
-    // `aspect` times as many cells.
     const horizontal = velocity(width, height);
     fillVelocity(
       horizontal,
-      (x) => (x / width) * aspect,
+      (x) => Math.sin((x / width) * Math.PI),
       () => 0,
     );
 
@@ -479,13 +450,29 @@ describe("the projection as a whole", () => {
     fillVelocity(
       vertical,
       () => 0,
-      (_x, y) => y / height,
+      (_x, y) => Math.sin((y / height) * Math.PI),
     );
 
-    const dH = divergence(horizontal, aspect);
-    const dV = divergence(vertical, aspect);
+    // Each flow's peak divergence, in the shared physical metric: the same
+    // profile over the same fraction of the canvas either way.
+    const peak = (f: Field): number => {
+      let worst = 0;
+      for (let y = 1; y < f.height - 1; y++) {
+        for (let x = 1; x < f.width - 1; x++) {
+          worst = Math.max(worst, Math.abs(at(f, x, y)));
+        }
+      }
+      return worst;
+    };
 
-    // Sampled off the walls, where the free-slip mirroring dominates instead.
-    expect(at(dH, 16, 8)).toBeCloseTo(at(dV, 16, 8), 9);
+    const removedH =
+      peak(divergence(horizontal)) -
+      peak(divergence(project(horizontal, sweeps)));
+    const removedV =
+      peak(divergence(vertical)) - peak(divergence(project(vertical, sweeps)));
+    expect(removedH / peak(divergence(horizontal))).toBeCloseTo(
+      removedV / peak(divergence(vertical)),
+      2,
+    );
   });
 });

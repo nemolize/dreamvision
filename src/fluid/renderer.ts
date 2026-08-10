@@ -8,6 +8,8 @@ import {
   VELOCITY_DISSIPATION,
   WORKGROUP_SIZE,
 } from "./config";
+import type { ProjectionScale } from "./projection";
+import { jacobiDiagonal, projectionScale } from "./projection";
 import renderShaderSource from "./render.wgsl?raw";
 import simulationShaderSource from "./simulation.wgsl?raw";
 import type { FluidRenderer, Pointer } from "./types";
@@ -23,9 +25,15 @@ const UNIFORM = {
   splatRadius: 13,
   splatActive: 14,
   aspect: 15,
+  // `divergence` and `gradientSubtract` share one pair: both differentiate
+  // once, so both scale by the reciprocal cell size. `projection.test.ts`
+  // asserts they stay equal.
+  differenceScale: 16,
+  laplacianScale: 18,
+  jacobiDiagonal: 20,
 } as const;
 
-const UNIFORM_FLOATS = 16;
+const UNIFORM_FLOATS = 24;
 const UNIFORM_BYTES = UNIFORM_FLOATS * 4;
 
 const PARAM_BYTES = 16;
@@ -235,6 +243,8 @@ export const createFluidRenderer = (
   interface Resources {
     simGrid: Grid;
     dyeGrid: Grid;
+    /** Fixed by the grid and the canvas, so resolved once per resize. */
+    scale: ProjectionScale;
     velocity: DoubleBuffer;
     dye: DoubleBuffer;
     pressure: DoubleBuffer;
@@ -260,6 +270,7 @@ export const createFluidRenderer = (
   ): Resources => {
     const simGrid = fitGrid(canvasWidth, canvasHeight, SIM_RESOLUTION);
     const dyeGrid = fitGrid(canvasWidth, canvasHeight, DYE_RESOLUTION);
+    const scale = projectionScale(simGrid.width, simGrid.height);
 
     const velocity = new DoubleBuffer(device, simGrid, VELOCITY_FORMAT);
     const dye = new DoubleBuffer(device, dyeGrid, DYE_FORMAT);
@@ -394,6 +405,7 @@ export const createFluidRenderer = (
     return {
       simGrid,
       dyeGrid,
+      scale,
       velocity,
       dye,
       pressure,
@@ -434,7 +446,7 @@ export const createFluidRenderer = (
     const current = resources;
     if (current === null) return;
 
-    const { simGrid, dyeGrid, velocity, dye, pressure } = current;
+    const { simGrid, dyeGrid, scale, velocity, dye, pressure } = current;
 
     uniformData.set([simGrid.width, simGrid.height], UNIFORM.simSize);
     uniformData.set([pointer.x, pointer.y], UNIFORM.splatPoint);
@@ -444,6 +456,15 @@ export const createFluidRenderer = (
     uniformData[UNIFORM.splatRadius] = SPLAT_RADIUS;
     uniformData[UNIFORM.splatActive] = pointer.down ? 1 : 0;
     uniformData[UNIFORM.aspect] = dyeGrid.width / dyeGrid.height;
+    uniformData.set(
+      [scale.divergenceX, scale.divergenceY],
+      UNIFORM.differenceScale,
+    );
+    uniformData.set(
+      [scale.laplacianX, scale.laplacianY],
+      UNIFORM.laplacianScale,
+    );
+    uniformData[UNIFORM.jacobiDiagonal] = jacobiDiagonal(scale);
 
     device.queue.writeBuffer(uniformBuffer, 0, uniformData);
 

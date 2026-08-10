@@ -8,16 +8,22 @@
  * what lets `projection.test.ts` check the operator identities on the CPU,
  * with no adapter.
  *
- * Velocity is stored in normalised units per second, so the canvas spans 0..1
- * on both axes and one x-unit is a different physical length from one y-unit
- * on a non-square viewport. That is where #681's anisotropy comes from — not
- * from the cells, which `fitGrid` already keeps square. Confining the metric
- * to these three passes leaves advection, the splat, and the pointer in the
- * units they already had.
+ * Velocity is stored in normalised units per second — the canvas spans 0..1 on
+ * *each* axis independently, so `vx = 1` crosses the full width in a second
+ * while `vy = 1` crosses the full height. `advect` is what fixes that reading:
+ * it converts to cell offsets by multiplying each component by that grid's own
+ * dimension, so one unit of `vx` covers `width` cells and one unit of `vy`
+ * covers `height` cells.
  *
- * Taking the canvas height as the unit of length, a cell measures `aspect /
- * width` across and `1 / height` down; every factor below follows from those
- * two lengths.
+ * Cells are square — `fitGrid` sees to that — so a cell is the natural unit of
+ * length here, and the physical speed of a velocity component is its value
+ * times the cell count along its axis. Hence the per-axis weights below: the x
+ * difference carries `width`, the y difference `height`. Summing them with
+ * equal weight, as the passes did before #681, under-counts x by the aspect
+ * ratio — 44% on a 16:9 canvas.
+ *
+ * Confining the conversion to these three passes leaves advection, the splat,
+ * and the pointer in the units they already had.
  */
 
 /** Per-axis factors the three projection passes must agree on. */
@@ -39,23 +45,14 @@ export interface ProjectionScale {
 export const projectionScale = (
   width: number,
   height: number,
-  aspect: number,
-): ProjectionScale => {
-  // Kept per-axis rather than collapsed to one `h`: rounding the cell counts
-  // to whole numbers leaves the two slightly apart, and `fitGrid`'s minimum of
-  // 2 cells drives them far apart at extreme aspects.
-  const cellX = aspect / width;
-  const cellY = 1 / height;
-
-  return {
-    divergenceX: 1 / cellX,
-    divergenceY: 1 / cellY,
-    gradientX: 1 / cellX,
-    gradientY: 1 / cellY,
-    laplacianX: 1 / (cellX * cellX),
-    laplacianY: 1 / (cellY * cellY),
-  };
-};
+): ProjectionScale => ({
+  divergenceX: width,
+  divergenceY: height,
+  gradientX: width,
+  gradientY: height,
+  laplacianX: width * width,
+  laplacianY: height * height,
+});
 
 /** What the Jacobi sweep's weighted mean of the neighbours divides by. */
 export const jacobiDiagonal = (scale: ProjectionScale): number =>
