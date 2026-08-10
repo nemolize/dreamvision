@@ -64,7 +64,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       # checkout's own safe.directory lasts only for its step; the `prepare`
-      # script (`hk install`) that `pnpm install` runs needs it too.
+      # script (`lefthook install`) that `pnpm install` runs needs it too.
       - run: git config --global --add safe.directory "$(pwd)"
       - uses: ./.github/actions/setup
       - name: Assert the image ships the Playwright version we depend on
