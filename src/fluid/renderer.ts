@@ -9,7 +9,7 @@ import {
   WORKGROUP_SIZE,
 } from "./config";
 import type { ProjectionScale } from "./projection";
-import { projectionScale } from "./projection";
+import { projectionScale, projectionUniform } from "./projection";
 import renderShaderSource from "./render.wgsl?raw";
 import simulationShaderSource from "./simulation.wgsl?raw";
 import type { FluidRenderer, Pointer } from "./types";
@@ -452,8 +452,9 @@ export const createFluidRenderer = (
     uniformData[UNIFORM.splatRadius] = SPLAT_RADIUS;
     uniformData[UNIFORM.splatActive] = pointer.down ? 1 : 0;
     uniformData[UNIFORM.aspect] = dyeGrid.width / dyeGrid.height;
-    uniformData.set([scale.divergenceX, scale.divergenceY], UNIFORM.toCells);
-    uniformData.set([scale.gradientX, scale.gradientY], UNIFORM.toStored);
+    const metric = projectionUniform(scale);
+    uniformData.set(metric.toCells, UNIFORM.toCells);
+    uniformData.set(metric.toStored, UNIFORM.toStored);
 
     device.queue.writeBuffer(uniformBuffer, 0, uniformData);
 

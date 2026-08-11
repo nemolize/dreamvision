@@ -11,33 +11,41 @@
  * component's speed in cells is its value times the cell count along its axis.
  *
  * The conversion runs both ways and the two are reciprocal: `divergence` reads
- * stored velocity and reports a rate in cells, so it multiplies;
- * `gradientSubtract` computes a correction in cells and writes it back as
- * stored velocity, so it divides. Weighting both alike — the state this file
- * was added to fix — leaves the projection anisotropic in the correction while
- * the divergence it reports still falls, so only the written velocity reveals
- * it. The two cancel in between, which is why the Jacobi sweep inverts the
- * plain 5-point Laplacian with no weights of its own.
+ * stored velocity and reports a rate in cells; `gradientSubtract` computes a
+ * correction in cells and writes it back as stored velocity. Weighting both the
+ * same way leaves the projection anisotropic in the correction while the
+ * divergence it reports still falls — an error only the written velocity
+ * reveals, which is what the tests here are shaped around.
  */
 
-/** Per-axis factors the three projection passes must agree on. */
+/** Per-axis conversions the three projection passes must agree on. */
 export interface ProjectionScale {
-  /** Stored velocity to cells per second, for `divergence`'s x difference. */
-  divergenceX: number;
-  /** Stored velocity to cells per second, for `divergence`'s y difference. */
-  divergenceY: number;
-  /** Cells per second back to stored, for `gradientSubtract`'s x correction. */
-  gradientX: number;
-  /** Cells per second back to stored, for `gradientSubtract`'s y correction. */
-  gradientY: number;
+  /** Stored velocity to cells per second, per axis — what `divergence` reads. */
+  toCellsX: number;
+  toCellsY: number;
+  /** Cells per second back to stored, per axis — what the gradient writes. */
+  toStoredX: number;
+  toStoredY: number;
 }
 
 export const projectionScale = (
   width: number,
   height: number,
 ): ProjectionScale => ({
-  divergenceX: width,
-  divergenceY: height,
-  gradientX: 1 / width,
-  gradientY: 1 / height,
+  toCellsX: width,
+  toCellsY: height,
+  toStoredX: 1 / width,
+  toStoredY: 1 / height,
+});
+
+/**
+ * Pack the two conversions into the shader's uniform slots. Out here rather
+ * than in the renderer so a test can reach it — swapping the two reverses the
+ * metric on the GPU, and nothing reading `projectionScale` would notice.
+ */
+export const projectionUniform = (
+  scale: ProjectionScale,
+): { toCells: [number, number]; toStored: [number, number] } => ({
+  toCells: [scale.toCellsX, scale.toCellsY],
+  toStored: [scale.toStoredX, scale.toStoredY],
 });
