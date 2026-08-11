@@ -31,6 +31,32 @@ export const SPLAT_RADIUS = 0.0035;
 /** Scales normalised pointer motion into the velocity written to the field. */
 export const SPLAT_FORCE = 30;
 
+/** Ceiling on splats injected in one frame. The seed burst is the only thing
+ * that approaches it; the cap bounds the uniform buffer the splat pass indexes
+ * into, so anything beyond it is dropped rather than read out of range. */
+export const MAX_SPLATS_PER_FRAME = 32;
+
+/** Splats injected once at startup, so the canvas opens mid-motion instead of
+ * black. Range is inclusive at both ends. */
+export const SEED_SPLATS_MIN = 8;
+export const SEED_SPLATS_MAX = 20;
+
+/** How long the pointer must be idle before the simulation starts feeding
+ * itself, and the gap between those splats once it does. Without this the dye
+ * dissipates and an untouched page fades back to black. */
+export const IDLE_DELAY_SECONDS = 3;
+export const IDLE_INTERVAL_SECONDS = 1.4;
+
+/** Normalised travel given to a splat nobody dragged — the seed burst and the
+ * idle feed. Scaled like a pointer displacement, so it is comparable to
+ * `SPLAT_FORCE` times a fraction of the screen. */
+export const AMBIENT_SPLAT_FORCE = 12;
+
+/** Brightens a splat nobody dragged. A dragged splat is re-applied on every
+ * frame of the drag and accumulates; these land once, so at the pointer's
+ * per-frame intensity they read as almost black. */
+export const AMBIENT_DYE_GAIN = 8;
+
 /** Workgroup edge length; 8x8 = 64 invocations, a safe fit everywhere. The
  * renderer substitutes it into the shader source, so this is the only copy. */
 export const WORKGROUP_SIZE = 8;

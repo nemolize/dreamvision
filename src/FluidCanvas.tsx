@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 
+import { IdleSplatter, seedSplats } from "@/fluid/ambient";
 import { MAX_STEPS_PER_FRAME, TIME_STEP } from "@/fluid/config";
 import { GpuUnavailableError, initGpu } from "@/fluid/gpu";
 import { PointerTracker } from "@/fluid/pointer";
 import { createFluidRenderer } from "@/fluid/renderer";
-import type { FluidRenderer } from "@/fluid/types";
+import type { FluidRenderer, Splat } from "@/fluid/types";
 
 /** Cap the backing store on high-DPI displays: past 2x the extra pixels cost
  * fill rate without being visible. */
@@ -86,6 +87,10 @@ export const FluidCanvas = () => {
 
       let previous = performance.now();
       let owed = 0;
+      const idle = new IdleSplatter();
+      // Held until the first step runs: the loop may render before enough time
+      // has accumulated for a step, and the burst has to land inside one.
+      let pending: Splat[] = seedSplats(Math.random);
 
       const loop = (now: number): void => {
         owed += (now - previous) / 1000;
@@ -97,12 +102,21 @@ export const FluidCanvas = () => {
         );
         owed -= steps * TIME_STEP;
 
-        // The pointer's motion belongs to this frame, so only the first step
-        // splats it — replaying it on each catch-up step would multiply the
-        // force by however far behind the loop had fallen.
-        const sample = pointer.consume();
+        const dragged = pointer.consume();
+        if (dragged !== null) {
+          pending.push(dragged);
+          idle.notifyActivity();
+        }
+
         for (let step = 0; step < steps; step++) {
-          renderer?.frame(step === 0 ? sample : { ...sample, dx: 0, dy: 0 });
+          const drifted = idle.step(TIME_STEP, Math.random);
+          if (drifted !== null) pending.push(drifted);
+
+          // Drained into the first step that runs: replaying the frame's splats
+          // on each catch-up step would multiply their force by however far
+          // behind the loop had fallen.
+          renderer?.frame(pending);
+          pending = [];
         }
 
         frameId = requestAnimationFrame(loop);

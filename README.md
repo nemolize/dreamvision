@@ -1,8 +1,9 @@
 # DreamVision
 
 Real-time fluid simulation filling the browser viewport, solved entirely on the
-GPU with [WebGPU](https://www.w3.org/TR/webgpu/) compute shaders. Drag anywhere
-to stir the fluid.
+GPU with [WebGPU](https://www.w3.org/TR/webgpu/) compute shaders. It opens
+mid-motion and keeps stirring itself while left alone; drag anywhere to stir it
+yourself.
 
 Built with React + Vite and deployed to
 [Cloudflare Workers](https://workers.cloudflare.com/) as static assets.
@@ -35,7 +36,8 @@ A [stable-fluids](https://pages.cs.wisc.edu/~chaol/data/cs777/stam-stable_fluids
 solver (Stam 1999) runs as five compute passes per frame over storage textures:
 
 1. **advect** — carry velocity along itself
-2. **splat** — inject force and colour under the pointer
+2. **splat** — inject a blob of force and colour, once per splat the frame has
+   to place
 3. **divergence** — measure how much the velocity field compresses
 4. **pressure** — Jacobi sweeps solving for the pressure that cancels it
 5. **gradient subtract** — remove that pressure gradient, leaving a
@@ -43,6 +45,13 @@ solver (Stam 1999) runs as five compute passes per frame over storage textures:
 
 The dye field then advects along the projected velocity and a fullscreen
 triangle draws it.
+
+Splats come from three places: a drag, a burst thrown in at startup so the first
+frame is already in motion, and a slow feed that resumes whenever the pointer
+has been still for a few seconds — without it the dye dissipates and the canvas
+returns to black. The two uninvited kinds land once each rather than
+accumulating over a drag's frames, so they are injected brighter to compensate
+(`AMBIENT_DYE_GAIN`).
 
 The solver advances by a fixed timestep while the frame loop accumulates real
 elapsed time, so the fluid behaves the same on a 60Hz and a 120Hz display; a
@@ -109,6 +118,12 @@ alone prove nothing, since the splat pass writes colour straight under the
 drag path — only advection over a projected velocity field keeps the field
 moving with no further input. Verified by disabling advection and confirming
 the suite fails.
+
+The startup burst has its own case, asserting the canvas is lit before anything
+touches the pointer. The idle feed is left to `ambient.test.ts`: telling it
+apart from the burst on screen means waiting for the dye to dissipate in
+wall-clock time, and the frame loop's catch-up cap makes that wait unreliable —
+a version with the feed disabled still passed such a check.
 
 What that suite cannot see is whether the projection is _right_: a wrong sign,
 a swapped axis, or a missing per-axis weight still leaves something that looks

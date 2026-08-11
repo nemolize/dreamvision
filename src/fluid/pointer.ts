@@ -1,5 +1,5 @@
 import { SPLAT_FORCE } from "./config";
-import type { Pointer } from "./types";
+import type { Splat } from "./types";
 
 /** Dye is additive and unbounded, so a splat starts dim and brightens as the
  * pointer lingers. */
@@ -60,21 +60,21 @@ export class PointerTracker {
     this.active = false;
   }
 
-  /** Read the frame's input and clear it. `down` reports whether there is
-   * input to splat, not whether the button is still held: a drag completed
-   * between two frames would otherwise be dropped entirely. */
-  consume(): Pointer {
-    const sample: Pointer = {
+  /** Read the frame's input and clear it. A drag that began and ended between
+   * two frames still yields a splat — its motion has never been rendered. */
+  consume(): Splat | null {
+    if (!this.active && !this.pending) return null;
+
+    const splat: Splat = {
       x: this.x,
       y: this.y,
       dx: this.dx,
       dy: this.dy,
-      down: this.active || this.pending,
       color: this.color,
     };
     this.dx = 0;
     this.dy = 0;
     this.pending = false;
-    return sample;
+    return splat;
   }
 }

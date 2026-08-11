@@ -1,6 +1,7 @@
 import {
   DYE_DISSIPATION,
   DYE_RESOLUTION,
+  MAX_SPLATS_PER_FRAME,
   PRESSURE_ITERATIONS,
   SIM_RESOLUTION,
   SPLAT_RADIUS,
@@ -12,25 +13,30 @@ import type { ProjectionScale } from "./projection";
 import { projectionScale, projectionUniform } from "./projection";
 import renderShaderSource from "./render.wgsl?raw";
 import simulationShaderSource from "./simulation.wgsl?raw";
-import type { FluidRenderer, Pointer } from "./types";
+import type { FluidRenderer, Splat } from "./types";
 
 /** Float index of each `Uniforms` member in `simulation.wgsl` — WGSL aligns
  * the `vec4f` to 16 bytes, leaving a hole a positional array would misfill. */
 const UNIFORM = {
   simSize: 0,
-  splatPoint: 2,
-  splatDelta: 4,
-  splatColor: 8,
-  dt: 12,
-  splatRadius: 13,
-  splatActive: 14,
-  aspect: 15,
-  toCells: 16,
-  toStored: 18,
+  dt: 2,
+  aspect: 3,
+  toCells: 4,
+  toStored: 6,
 } as const;
 
-const UNIFORM_FLOATS = 20;
+const UNIFORM_FLOATS = 8;
 const UNIFORM_BYTES = UNIFORM_FLOATS * 4;
+
+/** Float index of each `SplatUniforms` member in `simulation.wgsl`. */
+const SPLAT_UNIFORM = {
+  point: 0,
+  delta: 2,
+  color: 4,
+  radius: 8,
+} as const;
+
+const SPLAT_UNIFORM_FLOATS = 12;
 
 const PARAM_BYTES = 16;
 
@@ -129,6 +135,19 @@ export const createFluidRenderer = (
   });
   const uniformData = new Float32Array(UNIFORM_FLOATS);
 
+  // Every splat in a frame needs its own live copy of `SplatUniforms`, selected
+  // by dynamic offset — so the slots are spaced by the device's offset
+  // alignment rather than by the struct's own size.
+  const splatSlotBytes = Math.max(
+    device.limits.minUniformBufferOffsetAlignment,
+    SPLAT_UNIFORM_FLOATS * 4,
+  );
+  const splatBuffer = device.createBuffer({
+    size: splatSlotBytes * MAX_SPLATS_PER_FRAME,
+    usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+  });
+  const splatData = new Float32Array(SPLAT_UNIFORM_FLOATS);
+
   const sharedLayout = device.createBindGroupLayout({
     entries: [
       {
@@ -136,12 +155,30 @@ export const createFluidRenderer = (
         visibility: GPUShaderStage.COMPUTE,
         buffer: { type: "uniform" },
       },
+      {
+        binding: 1,
+        visibility: GPUShaderStage.COMPUTE,
+        buffer: {
+          type: "uniform",
+          hasDynamicOffset: true,
+          minBindingSize: SPLAT_UNIFORM_FLOATS * 4,
+        },
+      },
     ],
   });
 
   const sharedBindGroup = device.createBindGroup({
     layout: sharedLayout,
-    entries: [{ binding: 0, resource: { buffer: uniformBuffer } }],
+    entries: [
+      { binding: 0, resource: { buffer: uniformBuffer } },
+      {
+        binding: 1,
+        resource: {
+          buffer: splatBuffer,
+          size: SPLAT_UNIFORM_FLOATS * 4,
+        },
+      },
+    ],
   });
 
   const texture = (binding: number): GPUBindGroupLayoutEntry => ({
@@ -438,19 +475,14 @@ export const createFluidRenderer = (
 
   resize(width, height);
 
-  const frame = (pointer: Pointer): void => {
+  const frame = (splats: readonly Splat[]): void => {
     const current = resources;
     if (current === null) return;
 
     const { simGrid, dyeGrid, scale, velocity, dye, pressure } = current;
 
     uniformData.set([simGrid.width, simGrid.height], UNIFORM.simSize);
-    uniformData.set([pointer.x, pointer.y], UNIFORM.splatPoint);
-    uniformData.set([pointer.dx, pointer.dy], UNIFORM.splatDelta);
-    uniformData.set(pointer.color, UNIFORM.splatColor);
     uniformData[UNIFORM.dt] = TIME_STEP;
-    uniformData[UNIFORM.splatRadius] = SPLAT_RADIUS;
-    uniformData[UNIFORM.splatActive] = pointer.down ? 1 : 0;
     uniformData[UNIFORM.aspect] = dyeGrid.width / dyeGrid.height;
     const metric = projectionUniform(scale);
     uniformData.set(metric.toCells, UNIFORM.toCells);
@@ -458,9 +490,24 @@ export const createFluidRenderer = (
 
     device.queue.writeBuffer(uniformBuffer, 0, uniformData);
 
+    const applied = splats.slice(0, MAX_SPLATS_PER_FRAME);
+    applied.forEach((splat, index) => {
+      splatData.set([splat.x, splat.y], SPLAT_UNIFORM.point);
+      splatData.set([splat.dx, splat.dy], SPLAT_UNIFORM.delta);
+      splatData.set(splat.color, SPLAT_UNIFORM.color);
+      splatData[SPLAT_UNIFORM.radius] = SPLAT_RADIUS;
+      device.queue.writeBuffer(
+        splatBuffer,
+        index * splatSlotBytes,
+        splatData.buffer,
+        splatData.byteOffset,
+        splatData.byteLength,
+      );
+    });
+
     const encoder = device.createCommandEncoder();
     const pass = encoder.beginComputePass();
-    pass.setBindGroup(0, sharedBindGroup);
+    pass.setBindGroup(0, sharedBindGroup, [0]);
 
     const simDispatch = dispatchSize(simGrid);
     const dyeDispatch = dispatchSize(dyeGrid);
@@ -483,11 +530,22 @@ export const createFluidRenderer = (
     );
     velocity.swap();
 
-    run(pipelines.splat, current.splatVelocity[velocity.readFace], simDispatch);
-    velocity.swap();
+    // 2. Inject each splat's force and colour. Every splat is a full pass over
+    // both grids, so the frame's cost grows with their count — the seed burst
+    // is deliberately a one-off.
+    applied.forEach((_, index) => {
+      pass.setBindGroup(0, sharedBindGroup, [index * splatSlotBytes]);
 
-    run(pipelines.splat, current.splatDye[dye.readFace], dyeDispatch);
-    dye.swap();
+      run(
+        pipelines.splat,
+        current.splatVelocity[velocity.readFace],
+        simDispatch,
+      );
+      velocity.swap();
+
+      run(pipelines.splat, current.splatDye[dye.readFace], dyeDispatch);
+      dye.swap();
+    });
 
     // 3. Project: make the velocity field divergence-free.
     run(
@@ -546,6 +604,7 @@ export const createFluidRenderer = (
       if (resources !== null) releaseResources(resources);
       resources = null;
       uniformBuffer.destroy();
+      splatBuffer.destroy();
     },
   };
 };

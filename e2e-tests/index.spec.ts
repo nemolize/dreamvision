@@ -23,33 +23,39 @@ const stir = async (
   await page.mouse.up();
 };
 
+/** Columns each screenshot is downsampled to; the row count follows from the
+ * canvas' aspect, so a sample's row is its index divided by this. */
+const SAMPLE_WIDTH = 64;
+
 /** Read through a screenshot because a WebGPU canvas does not preserve its
  * drawing buffer: `drawImage` onto a 2D canvas returns transparent black. */
 const sampleCanvas = async (page: Page): Promise<number[]> => {
   const png = await page.getByLabel("Fluid simulation").screenshot();
   const dataUrl = `data:image/png;base64,${png.toString("base64")}`;
 
-  return page.evaluate(async (url) => {
-    const bitmap = await createImageBitmap(await (await fetch(url)).blob());
-    const width = 64;
-    const height = Math.max(
-      1,
-      Math.round((width * bitmap.height) / bitmap.width),
-    );
-    const surface = document.createElement("canvas");
-    surface.width = width;
-    surface.height = height;
-    const ctx = surface.getContext("2d");
-    if (ctx === null) return [];
-    ctx.drawImage(bitmap, 0, 0, width, height);
+  return page.evaluate(
+    async ({ url, width }) => {
+      const bitmap = await createImageBitmap(await (await fetch(url)).blob());
+      const height = Math.max(
+        1,
+        Math.round((width * bitmap.height) / bitmap.width),
+      );
+      const surface = document.createElement("canvas");
+      surface.width = width;
+      surface.height = height;
+      const ctx = surface.getContext("2d");
+      if (ctx === null) return [];
+      ctx.drawImage(bitmap, 0, 0, width, height);
 
-    const { data } = ctx.getImageData(0, 0, width, height);
-    const pixels: number[] = [];
-    for (let i = 0; i < data.length; i += 4) {
-      pixels.push((data[i] ?? 0) + (data[i + 1] ?? 0) + (data[i + 2] ?? 0));
-    }
-    return pixels;
-  }, dataUrl);
+      const { data } = ctx.getImageData(0, 0, width, height);
+      const pixels: number[] = [];
+      for (let i = 0; i < data.length; i += 4) {
+        pixels.push((data[i] ?? 0) + (data[i + 1] ?? 0) + (data[i + 2] ?? 0));
+      }
+      return pixels;
+    },
+    { url: dataUrl, width: SAMPLE_WIDTH },
+  );
 };
 
 const litFraction = async (page: Page): Promise<number> => {
@@ -112,18 +118,36 @@ test.describe("fluid canvas", () => {
     // rather than skipping keeps a silently broken simulation from passing.
     await expect(page.getByRole("alert")).toHaveCount(0);
 
-    // The canvas starts black, so a lit area proves the compute passes ran and
-    // the display pass sampled their output.
-    expect(await litFraction(page)).toBeLessThan(0.001);
+    // The seed burst paints the canvas before any input, so a lit area here
+    // already proves the compute passes ran and the display pass sampled their
+    // output — the drag below then has to show up on top of it.
+    await expect
+      .poll(() => litFraction(page), { timeout: 60_000 })
+      .toBeGreaterThan(0.01);
 
     const viewport = page.viewportSize() ?? { width: 1280, height: 720 };
     await stir(page, viewport);
 
-    // Generous because each poll round is a screenshot, which costs seconds
-    // against CI's software renderer — a tight window would only get one try.
+    // The seed burst already lights the canvas, so brightness alone no longer
+    // separates the drag from it: this reads the band the drag ran through and
+    // asks that it be brighter than the canvas as a whole.
     await expect
-      .poll(() => litFraction(page), { timeout: 60_000 })
-      .toBeGreaterThan(0.01);
+      .poll(
+        async () => {
+          const pixels = await sampleCanvas(page);
+          if (pixels.length === 0) return -1;
+          const rows = Math.round(pixels.length / SAMPLE_WIDTH);
+          const band = pixels.slice(
+            Math.floor(rows * 0.45) * SAMPLE_WIDTH,
+            Math.ceil(rows * 0.55) * SAMPLE_WIDTH,
+          );
+          const mean = (values: number[]): number =>
+            values.reduce((sum, value) => sum + value, 0) / values.length;
+          return mean(band) - mean(pixels);
+        },
+        { timeout: 60_000 },
+      )
+      .toBeGreaterThan(0);
 
     // The splat pass alone satisfies the check above; only working advection
     // keeps the picture changing once the pointer is up.
@@ -134,6 +158,19 @@ test.describe("fluid canvas", () => {
     };
 
     expect(await changeBetweenFrames()).toBeGreaterThan(0.002);
+  });
+
+  test("paints the seed burst before any input", async ({ page }) => {
+    test.setTimeout(120_000);
+
+    await page.goto("/");
+    await expect(page.getByLabel("Fluid simulation")).toBeVisible();
+    await expect(page.getByRole("alert")).toHaveCount(0);
+
+    // Only the seed burst can have lit this: no input, and no wait for the idle
+    // feed. Telling the two apart on screen would mean waiting out the dye in
+    // wall-clock time, which the loop's catch-up cap makes unreliable.
+    expect(await litFraction(page)).toBeGreaterThan(0.01);
   });
 
   test("serves the SPA shell for a deep route with no file on disk", async ({
