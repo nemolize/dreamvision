@@ -1,3 +1,4 @@
+import { hueToRgb } from "./color";
 import {
   AMBIENT_DYE_GAIN,
   AMBIENT_SPLAT_FORCE,
@@ -6,14 +7,34 @@ import {
   SEED_SPLATS_MAX,
   SEED_SPLATS_MIN,
 } from "./config";
-import { hueToRgb } from "./pointer";
 import type { Splat } from "./types";
 
-/** Draws in 0..1. Injected so the tests can drive the generators from a known
- * sequence rather than asserting on whatever `Math.random` returned. */
+/** Draws in 0..1. */
 export type Random = () => number;
 
-/** A splat at a random point, thrown in a random direction. */
+/** Which uninvited splat sources are live. Both on unless asked otherwise —
+ * the switches exist so a test can attribute dye to one source, which it
+ * cannot do while another is painting the same canvas. */
+export interface AmbientSources {
+  seed: boolean;
+  idle: boolean;
+}
+
+/** `?ambient=off` silences both; `?ambient=seed` / `?ambient=idle` keep only
+ * the named one. */
+export const ambientSources = (search: string): AmbientSources => {
+  switch (new URLSearchParams(search).get("ambient")) {
+    case "off":
+      return { seed: false, idle: false };
+    case "seed":
+      return { seed: true, idle: false };
+    case "idle":
+      return { seed: false, idle: true };
+    default:
+      return { seed: true, idle: true };
+  }
+};
+
 export const randomSplat = (random: Random): Splat => {
   const angle = random() * Math.PI * 2;
   const [r, g, b] = hueToRgb(random());
@@ -39,21 +60,19 @@ export const seedSplats = (random: Random): Splat[] => {
  * keeps one drifting in every so often until the pointer takes over.
  */
 export class IdleSplatter {
-  /** Seconds since the last splat from any source, pointer included. */
+  /** Idle time counted toward the next splat. Pointer activity resets it; an
+   * idle splat rewinds it by one interval, so only the first wait is the full
+   * delay. */
   private quiet = 0;
 
-  /** Report pointer activity, which restarts the idle countdown. */
   notifyActivity(): void {
     this.quiet = 0;
   }
 
-  /** Advance by `dt` seconds and return the splat now due, if any. */
   step(dt: number, random: Random): Splat | null {
     this.quiet += dt;
     if (this.quiet < IDLE_DELAY_SECONDS) return null;
 
-    // Counted from the delay rather than reset to zero, so the interval governs
-    // the gap between idle splats while the longer delay applies only once.
     this.quiet = IDLE_DELAY_SECONDS - IDLE_INTERVAL_SECONDS;
     return randomSplat(random);
   }

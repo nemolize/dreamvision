@@ -15,8 +15,7 @@ import renderShaderSource from "./render.wgsl?raw";
 import simulationShaderSource from "./simulation.wgsl?raw";
 import type { FluidRenderer, Splat } from "./types";
 
-/** Float index of each `Uniforms` member in `simulation.wgsl` — WGSL aligns
- * the `vec4f` to 16 bytes, leaving a hole a positional array would misfill. */
+/** Float index of each `Uniforms` member in `simulation.wgsl`. */
 const UNIFORM = {
   simSize: 0,
   dt: 2,
@@ -28,7 +27,9 @@ const UNIFORM = {
 const UNIFORM_FLOATS = 8;
 const UNIFORM_BYTES = UNIFORM_FLOATS * 4;
 
-/** Float index of each `SplatUniforms` member in `simulation.wgsl`. */
+/** Float index of each `SplatUniforms` member in `simulation.wgsl` — WGSL
+ * aligns the `vec4f` to 16 bytes, leaving a hole a positional array would
+ * misfill. */
 const SPLAT_UNIFORM = {
   point: 0,
   delta: 2,
@@ -135,13 +136,11 @@ export const createFluidRenderer = (
   });
   const uniformData = new Float32Array(UNIFORM_FLOATS);
 
-  // Every splat in a frame needs its own live copy of `SplatUniforms`, selected
-  // by dynamic offset — so the slots are spaced by the device's offset
-  // alignment rather than by the struct's own size.
-  const splatSlotBytes = Math.max(
-    device.limits.minUniformBufferOffsetAlignment,
-    SPLAT_UNIFORM_FLOATS * 4,
-  );
+  // Rounded UP rather than max()'d: a device whose alignment is below the
+  // struct size would otherwise get offsets that are not multiples of it.
+  const splatAlignment = device.limits.minUniformBufferOffsetAlignment;
+  const splatSlotBytes =
+    Math.ceil((SPLAT_UNIFORM_FLOATS * 4) / splatAlignment) * splatAlignment;
   const splatBuffer = device.createBuffer({
     size: splatSlotBytes * MAX_SPLATS_PER_FRAME,
     usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,

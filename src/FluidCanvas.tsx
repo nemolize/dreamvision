@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 
-import { IdleSplatter, seedSplats } from "@/fluid/ambient";
+import { ambientSources, IdleSplatter, seedSplats } from "@/fluid/ambient";
 import { MAX_STEPS_PER_FRAME, TIME_STEP } from "@/fluid/config";
 import { GpuUnavailableError, initGpu } from "@/fluid/gpu";
 import { PointerTracker } from "@/fluid/pointer";
@@ -87,10 +87,11 @@ export const FluidCanvas = () => {
 
       let previous = performance.now();
       let owed = 0;
+      const ambient = ambientSources(window.location.search);
       const idle = new IdleSplatter();
       // Held until the first step runs: the loop may render before enough time
       // has accumulated for a step, and the burst has to land inside one.
-      let pending: Splat[] = seedSplats(Math.random);
+      let pending: Splat[] = ambient.seed ? seedSplats(Math.random) : [];
 
       const loop = (now: number): void => {
         owed += (now - previous) / 1000;
@@ -109,7 +110,9 @@ export const FluidCanvas = () => {
         }
 
         for (let step = 0; step < steps; step++) {
-          const drifted = idle.step(TIME_STEP, Math.random);
+          const drifted = ambient.idle
+            ? idle.step(TIME_STEP, Math.random)
+            : null;
           if (drifted !== null) pending.push(drifted);
 
           // Drained into the first step that runs: replaying the frame's splats

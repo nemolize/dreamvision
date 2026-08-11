@@ -23,8 +23,7 @@ const stir = async (
   await page.mouse.up();
 };
 
-/** Columns each screenshot is downsampled to; the row count follows from the
- * canvas' aspect, so a sample's row is its index divided by this. */
+/** Columns each screenshot is downsampled to. */
 const SAMPLE_WIDTH = 64;
 
 /** Read through a screenshot because a WebGPU canvas does not preserve its
@@ -109,7 +108,10 @@ test.describe("fluid canvas", () => {
     // against CI's software renderer — the default 30s ceiling is not enough.
     test.setTimeout(120_000);
 
-    await page.goto("/");
+    // Ambient off, so every lit pixel below is the drag's: with the seed burst
+    // and idle feed running, dye the pointer never touched would satisfy the
+    // same assertions and a no-op drag would pass.
+    await page.goto("/?ambient=off");
 
     const canvas = page.getByLabel("Fluid simulation");
     await expect(canvas).toBeVisible();
@@ -118,36 +120,18 @@ test.describe("fluid canvas", () => {
     // rather than skipping keeps a silently broken simulation from passing.
     await expect(page.getByRole("alert")).toHaveCount(0);
 
-    // The seed burst paints the canvas before any input, so a lit area here
-    // already proves the compute passes ran and the display pass sampled their
-    // output — the drag below then has to show up on top of it.
-    await expect
-      .poll(() => litFraction(page), { timeout: 60_000 })
-      .toBeGreaterThan(0.01);
+    // The canvas starts black, so a lit area proves the compute passes ran and
+    // the display pass sampled their output.
+    expect(await litFraction(page)).toBeLessThan(0.001);
 
     const viewport = page.viewportSize() ?? { width: 1280, height: 720 };
     await stir(page, viewport);
 
-    // The seed burst already lights the canvas, so brightness alone no longer
-    // separates the drag from it: this reads the band the drag ran through and
-    // asks that it be brighter than the canvas as a whole.
+    // Generous because each poll round is a screenshot, which costs seconds
+    // against CI's software renderer — a tight window would only get one try.
     await expect
-      .poll(
-        async () => {
-          const pixels = await sampleCanvas(page);
-          if (pixels.length === 0) return -1;
-          const rows = Math.round(pixels.length / SAMPLE_WIDTH);
-          const band = pixels.slice(
-            Math.floor(rows * 0.45) * SAMPLE_WIDTH,
-            Math.ceil(rows * 0.55) * SAMPLE_WIDTH,
-          );
-          const mean = (values: number[]): number =>
-            values.reduce((sum, value) => sum + value, 0) / values.length;
-          return mean(band) - mean(pixels);
-        },
-        { timeout: 60_000 },
-      )
-      .toBeGreaterThan(0);
+      .poll(() => litFraction(page), { timeout: 60_000 })
+      .toBeGreaterThan(0.01);
 
     // The splat pass alone satisfies the check above; only working advection
     // keeps the picture changing once the pointer is up.
@@ -163,14 +147,33 @@ test.describe("fluid canvas", () => {
   test("paints the seed burst before any input", async ({ page }) => {
     test.setTimeout(120_000);
 
-    await page.goto("/");
+    // Seed only: with the idle feed also running, a missing burst would be
+    // covered for by the feed's first splat and this would still pass.
+    await page.goto("/?ambient=seed");
     await expect(page.getByLabel("Fluid simulation")).toBeVisible();
     await expect(page.getByRole("alert")).toHaveCount(0);
 
-    // Only the seed burst can have lit this: no input, and no wait for the idle
-    // feed. Telling the two apart on screen would mean waiting out the dye in
-    // wall-clock time, which the loop's catch-up cap makes unreliable.
-    expect(await litFraction(page)).toBeGreaterThan(0.01);
+    // Polled because the first frame lands behind GPU init, not because the
+    // burst takes time — it is injected into the very first step.
+    await expect
+      .poll(() => litFraction(page), { timeout: 60_000 })
+      .toBeGreaterThan(0.01);
+  });
+
+  test("keeps feeding itself while the pointer is idle", async ({ page }) => {
+    test.setTimeout(120_000);
+
+    // Idle only, so there is no seed burst to mistake for the feed: the canvas
+    // opens black and can only light up once the feed's first splat lands.
+    await page.goto("/?ambient=idle");
+    await expect(page.getByLabel("Fluid simulation")).toBeVisible();
+    await expect(page.getByRole("alert")).toHaveCount(0);
+
+    expect(await litFraction(page)).toBeLessThan(0.001);
+
+    await expect
+      .poll(() => litFraction(page), { timeout: 60_000 })
+      .toBeGreaterThan(0.01);
   });
 
   test("serves the SPA shell for a deep route with no file on disk", async ({

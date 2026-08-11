@@ -42,8 +42,7 @@ export const SEED_SPLATS_MIN = 8;
 export const SEED_SPLATS_MAX = 20;
 
 /** How long the pointer must be idle before the simulation starts feeding
- * itself, and the gap between those splats once it does. Without this the dye
- * dissipates and an untouched page fades back to black. */
+ * itself, and the gap between those splats once it does. */
 export const IDLE_DELAY_SECONDS = 3;
 export const IDLE_INTERVAL_SECONDS = 1.4;
 

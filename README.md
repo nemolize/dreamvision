@@ -119,11 +119,13 @@ drag path — only advection over a projected velocity field keeps the field
 moving with no further input. Verified by disabling advection and confirming
 the suite fails.
 
-The startup burst has its own case, asserting the canvas is lit before anything
-touches the pointer. The idle feed is left to `ambient.test.ts`: telling it
-apart from the burst on screen means waiting for the dye to dissipate in
-wall-clock time, and the frame loop's catch-up cap makes that wait unreliable —
-a version with the feed disabled still passed such a check.
+The three splat sources — drag, startup burst, idle feed — each get a case, and
+each runs with the other two switched off via `?ambient=`. Without that
+isolation the assertions cannot attribute what they see: a drag test on a
+self-stirring canvas passes with the drag deleted, and a burst test passes on
+the feed's first splat alone. Both were observed before the switch existed.
+Verified by mutation: disabling any one source fails its own case and only its
+own.
 
 What that suite cannot see is whether the projection is _right_: a wrong sign,
 a swapped axis, or a missing per-axis weight still leaves something that looks

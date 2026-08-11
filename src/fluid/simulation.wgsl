@@ -28,7 +28,7 @@ struct Uniforms {
 /// so they cannot be folded into the per-frame block.
 struct SplatUniforms {
   point: vec2f,        // normalised 0..1, origin top-left
-  delta: vec2f,        // travel x SPLAT_FORCE, a displacement rather than a rate
+  delta: vec2f,        // a displacement rather than a rate
   color: vec4f,
   radius: f32,         // divides squared distance, so a squared length
   _pad0: f32,

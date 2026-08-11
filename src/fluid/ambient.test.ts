@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { IdleSplatter, randomSplat, seedSplats } from "./ambient";
+import {
+  ambientSources,
+  IdleSplatter,
+  randomSplat,
+  seedSplats,
+} from "./ambient";
 import {
   AMBIENT_SPLAT_FORCE,
   IDLE_DELAY_SECONDS,
@@ -17,6 +22,32 @@ const sequence = (...values: number[]): (() => number) => {
   let index = 0;
   return () => values[Math.min(index++, values.length - 1)] ?? 0;
 };
+
+describe("ambientSources", () => {
+  it("runs both sources unless the page asked otherwise", () => {
+    const both = { seed: true, idle: true };
+    expect(ambientSources("")).toEqual(both);
+    expect(ambientSources("?other=off")).toEqual(both);
+    // An unrecognised value must not silently disable a source: a typo would
+    // otherwise leave a test measuring the wrong thing and still passing.
+    expect(ambientSources("?ambient=yes")).toEqual(both);
+  });
+
+  it("isolates each source for the e2e suite", () => {
+    expect(ambientSources("?ambient=off")).toEqual({
+      seed: false,
+      idle: false,
+    });
+    expect(ambientSources("?ambient=seed")).toEqual({
+      seed: true,
+      idle: false,
+    });
+    expect(ambientSources("?foo=1&ambient=idle")).toEqual({
+      seed: false,
+      idle: true,
+    });
+  });
+});
 
 describe("randomSplat", () => {
   it("lands inside the canvas", () => {
