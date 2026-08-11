@@ -16,8 +16,8 @@ here than broad reach.
 
 ## Getting Started
 
-- [mise](https://mise.jdx.dev/) provisions Node.js, pnpm, and `hk` at the
-  versions pinned in `mise.toml`.
+- [mise](https://mise.jdx.dev/) provisions Node.js and pnpm at the versions
+  pinned in `mise.toml`.
 
 ```bash
 mise install
@@ -25,9 +25,10 @@ pnpm install
 pnpm dev
 ```
 
-`mise install` has to come first: `pnpm install` runs `hk install` in its
-`prepare` script, and without the toolchain on your `PATH` it aborts with
-`hk: command not found`.
+`mise install` has to come first because pnpm itself comes from mise; there is
+no other step here that needs it. Git hooks are installed by `pnpm install`
+through its `prepare` script, which runs the `lefthook` binary out of
+`node_modules`, so they need nothing on your `PATH`.
 
 ## How it works
 
