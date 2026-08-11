@@ -108,10 +108,10 @@ test.describe("fluid canvas", () => {
     // against CI's software renderer — the default 30s ceiling is not enough.
     test.setTimeout(120_000);
 
-    // Ambient off, so every lit pixel below is the drag's: with the seed burst
-    // and idle feed running, dye the pointer never touched would satisfy the
-    // same assertions and a no-op drag would pass.
-    await page.goto("/?ambient=off");
+    // Seed off, so every lit pixel below is the drag's: with the burst running,
+    // dye the pointer never touched satisfies the same assertions and a no-op
+    // drag passes.
+    await page.goto("/?seed=off");
 
     const canvas = page.getByLabel("Fluid simulation");
     await expect(canvas).toBeVisible();
@@ -147,30 +147,13 @@ test.describe("fluid canvas", () => {
   test("paints the seed burst before any input", async ({ page }) => {
     test.setTimeout(120_000);
 
-    // Seed only: with the idle feed also running, a missing burst would be
-    // covered for by the feed's first splat and this would still pass.
-    await page.goto("/?ambient=seed");
+    await page.goto("/");
     await expect(page.getByLabel("Fluid simulation")).toBeVisible();
     await expect(page.getByRole("alert")).toHaveCount(0);
 
-    // Polled because the first frame lands behind GPU init, not because the
-    // burst takes time — it is injected into the very first step.
-    await expect
-      .poll(() => litFraction(page), { timeout: 60_000 })
-      .toBeGreaterThan(0.01);
-  });
-
-  test("keeps feeding itself while the pointer is idle", async ({ page }) => {
-    test.setTimeout(120_000);
-
-    // Idle only, so there is no seed burst to mistake for the feed: the canvas
-    // opens black and can only light up once the feed's first splat lands.
-    await page.goto("/?ambient=idle");
-    await expect(page.getByLabel("Fluid simulation")).toBeVisible();
-    await expect(page.getByRole("alert")).toHaveCount(0);
-
-    expect(await litFraction(page)).toBeLessThan(0.001);
-
+    // Nothing touches the pointer, and the sibling test above shows the canvas
+    // stays black without the burst — so this lights up only if it ran. Polled
+    // because the first frame lands behind GPU init, not because it takes time.
     await expect
       .poll(() => litFraction(page), { timeout: 60_000 })
       .toBeGreaterThan(0.01);

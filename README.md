@@ -2,8 +2,7 @@
 
 Real-time fluid simulation filling the browser viewport, solved entirely on the
 GPU with [WebGPU](https://www.w3.org/TR/webgpu/) compute shaders. It opens
-mid-motion and keeps stirring itself while left alone; drag anywhere to stir it
-yourself.
+mid-motion and settles as the dye dissipates; drag anywhere to stir it.
 
 Built with React + Vite and deployed to
 [Cloudflare Workers](https://workers.cloudflare.com/) as static assets.
@@ -46,12 +45,10 @@ solver (Stam 1999) runs as five compute passes per frame over storage textures:
 The dye field then advects along the projected velocity and a fullscreen
 triangle draws it.
 
-Splats come from three places: a drag, a burst thrown in at startup so the first
-frame is already in motion, and a slow feed that resumes whenever the pointer
-has been still for a few seconds — without it the dye dissipates and the canvas
-returns to black. The two uninvited kinds land once each rather than
-accumulating over a drag's frames, so they are injected brighter to compensate
-(`AMBIENT_DYE_GAIN`).
+Splats come from two places: a drag, and a burst thrown in at startup so the
+first frame is already in motion. A seeded splat lands once rather than
+accumulating over a drag's frames, so it is injected brighter to compensate
+(`SEED_DYE_GAIN`).
 
 The solver advances by a fixed timestep while the frame loop accumulates real
 elapsed time, so the fluid behaves the same on a 60Hz and a 120Hz display; a
@@ -119,13 +116,12 @@ drag path — only advection over a projected velocity field keeps the field
 moving with no further input. Verified by disabling advection and confirming
 the suite fails.
 
-The three splat sources — drag, startup burst, idle feed — each get a case, and
-each runs with the other two switched off via `?ambient=`. Without that
-isolation the assertions cannot attribute what they see: a drag test on a
-self-stirring canvas passes with the drag deleted, and a burst test passes on
-the feed's first splat alone. Both were observed before the switch existed.
-Verified by mutation: disabling any one source fails its own case and only its
-own.
+The drag case runs with the startup burst switched off via `?seed=off`. Without
+that the assertions cannot attribute what they see — on a pre-seeded canvas the
+drag case passed with the drag deleted, which is how the switch came to exist.
+The burst has its own case on the default page, resting on the drag case to
+establish that the canvas is otherwise black. Verified by mutation: disabling
+either source fails its own case and only its own.
 
 What that suite cannot see is whether the projection is _right_: a wrong sign,
 a swapped axis, or a missing per-axis weight still leaves something that looks

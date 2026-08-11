@@ -41,20 +41,15 @@ export const MAX_SPLATS_PER_FRAME = 32;
 export const SEED_SPLATS_MIN = 8;
 export const SEED_SPLATS_MAX = 20;
 
-/** How long the pointer must be idle before the simulation starts feeding
- * itself, and the gap between those splats once it does. */
-export const IDLE_DELAY_SECONDS = 3;
-export const IDLE_INTERVAL_SECONDS = 1.4;
+/** Normalised travel given to a seeded splat. Scaled like a pointer
+ * displacement, so it is comparable to `SPLAT_FORCE` times a fraction of the
+ * screen. */
+export const SEED_SPLAT_FORCE = 12;
 
-/** Normalised travel given to a splat nobody dragged — the seed burst and the
- * idle feed. Scaled like a pointer displacement, so it is comparable to
- * `SPLAT_FORCE` times a fraction of the screen. */
-export const AMBIENT_SPLAT_FORCE = 12;
-
-/** Brightens a splat nobody dragged. A dragged splat is re-applied on every
- * frame of the drag and accumulates; these land once, so at the pointer's
- * per-frame intensity they read as almost black. */
-export const AMBIENT_DYE_GAIN = 8;
+/** Brightens a seeded splat. A dragged splat is re-applied on every frame of
+ * the drag and accumulates; these land once, so at the pointer's per-frame
+ * intensity they read as almost black. */
+export const SEED_DYE_GAIN = 8;
 
 /** Workgroup edge length; 8x8 = 64 invocations, a safe fit everywhere. The
  * renderer substitutes it into the shader source, so this is the only copy. */
