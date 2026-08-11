@@ -23,33 +23,38 @@ const stir = async (
   await page.mouse.up();
 };
 
+/** Columns each screenshot is downsampled to. */
+const SAMPLE_WIDTH = 64;
+
 /** Read through a screenshot because a WebGPU canvas does not preserve its
  * drawing buffer: `drawImage` onto a 2D canvas returns transparent black. */
 const sampleCanvas = async (page: Page): Promise<number[]> => {
   const png = await page.getByLabel("Fluid simulation").screenshot();
   const dataUrl = `data:image/png;base64,${png.toString("base64")}`;
 
-  return page.evaluate(async (url) => {
-    const bitmap = await createImageBitmap(await (await fetch(url)).blob());
-    const width = 64;
-    const height = Math.max(
-      1,
-      Math.round((width * bitmap.height) / bitmap.width),
-    );
-    const surface = document.createElement("canvas");
-    surface.width = width;
-    surface.height = height;
-    const ctx = surface.getContext("2d");
-    if (ctx === null) return [];
-    ctx.drawImage(bitmap, 0, 0, width, height);
+  return page.evaluate(
+    async ({ url, width }) => {
+      const bitmap = await createImageBitmap(await (await fetch(url)).blob());
+      const height = Math.max(
+        1,
+        Math.round((width * bitmap.height) / bitmap.width),
+      );
+      const surface = document.createElement("canvas");
+      surface.width = width;
+      surface.height = height;
+      const ctx = surface.getContext("2d");
+      if (ctx === null) return [];
+      ctx.drawImage(bitmap, 0, 0, width, height);
 
-    const { data } = ctx.getImageData(0, 0, width, height);
-    const pixels: number[] = [];
-    for (let i = 0; i < data.length; i += 4) {
-      pixels.push((data[i] ?? 0) + (data[i + 1] ?? 0) + (data[i + 2] ?? 0));
-    }
-    return pixels;
-  }, dataUrl);
+      const { data } = ctx.getImageData(0, 0, width, height);
+      const pixels: number[] = [];
+      for (let i = 0; i < data.length; i += 4) {
+        pixels.push((data[i] ?? 0) + (data[i + 1] ?? 0) + (data[i + 2] ?? 0));
+      }
+      return pixels;
+    },
+    { url: dataUrl, width: SAMPLE_WIDTH },
+  );
 };
 
 const litFraction = async (page: Page): Promise<number> => {
@@ -103,7 +108,10 @@ test.describe("fluid canvas", () => {
     // against CI's software renderer — the default 30s ceiling is not enough.
     test.setTimeout(120_000);
 
-    await page.goto("/");
+    // Seed off, so every lit pixel below is the drag's: with the burst running,
+    // dye the pointer never touched satisfies the same assertions and a no-op
+    // drag passes.
+    await page.goto("/?seed=off");
 
     const canvas = page.getByLabel("Fluid simulation");
     await expect(canvas).toBeVisible();
@@ -134,6 +142,21 @@ test.describe("fluid canvas", () => {
     };
 
     expect(await changeBetweenFrames()).toBeGreaterThan(0.002);
+  });
+
+  test("paints the seed burst before any input", async ({ page }) => {
+    test.setTimeout(120_000);
+
+    await page.goto("/");
+    await expect(page.getByLabel("Fluid simulation")).toBeVisible();
+    await expect(page.getByRole("alert")).toHaveCount(0);
+
+    // Nothing touches the pointer, and the sibling test above shows the canvas
+    // stays black without the burst — so this lights up only if it ran. Polled
+    // because the first frame lands behind GPU init, not because it takes time.
+    await expect
+      .poll(() => litFraction(page), { timeout: 60_000 })
+      .toBeGreaterThan(0.01);
   });
 
   test("serves the SPA shell for a deep route with no file on disk", async ({

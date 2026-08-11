@@ -1,8 +1,8 @@
 # DreamVision
 
 Real-time fluid simulation filling the browser viewport, solved entirely on the
-GPU with [WebGPU](https://www.w3.org/TR/webgpu/) compute shaders. Drag anywhere
-to stir the fluid.
+GPU with [WebGPU](https://www.w3.org/TR/webgpu/) compute shaders. It opens
+mid-motion and settles as the dye dissipates; drag anywhere to stir it.
 
 Built with React + Vite and deployed to
 [Cloudflare Workers](https://workers.cloudflare.com/) as static assets.
@@ -35,7 +35,8 @@ A [stable-fluids](https://pages.cs.wisc.edu/~chaol/data/cs777/stam-stable_fluids
 solver (Stam 1999) runs as five compute passes per frame over storage textures:
 
 1. **advect** — carry velocity along itself
-2. **splat** — inject force and colour under the pointer
+2. **splat** — inject a blob of force and colour, once per splat the frame has
+   to place
 3. **divergence** — measure how much the velocity field compresses
 4. **pressure** — Jacobi sweeps solving for the pressure that cancels it
 5. **gradient subtract** — remove that pressure gradient, leaving a
@@ -43,6 +44,11 @@ solver (Stam 1999) runs as five compute passes per frame over storage textures:
 
 The dye field then advects along the projected velocity and a fullscreen
 triangle draws it.
+
+Splats come from two places: a drag, and a burst thrown in at startup so the
+first frame is already in motion. A seeded splat lands once rather than
+accumulating over a drag's frames, so it is injected brighter to compensate
+(`SEED_DYE_GAIN`).
 
 The solver advances by a fixed timestep while the frame loop accumulates real
 elapsed time, so the fluid behaves the same on a 60Hz and a 120Hz display; a
@@ -109,6 +115,13 @@ alone prove nothing, since the splat pass writes colour straight under the
 drag path — only advection over a projected velocity field keeps the field
 moving with no further input. Verified by disabling advection and confirming
 the suite fails.
+
+The drag case runs with the startup burst switched off via `?seed=off`. Without
+that the assertions cannot attribute what they see — on a pre-seeded canvas the
+drag case passed with the drag deleted, which is how the switch came to exist.
+The burst has its own case on the default page, resting on the drag case to
+establish that the canvas is otherwise black. Verified by mutation: disabling
+either source fails its own case and only its own.
 
 What that suite cannot see is whether the projection is _right_: a wrong sign,
 a swapped axis, or a missing per-axis weight still leaves something that looks

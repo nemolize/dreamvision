@@ -1,26 +1,6 @@
+import { randomColor } from "./color";
 import { SPLAT_FORCE } from "./config";
-import type { Pointer } from "./types";
-
-/** Dye is additive and unbounded, so a splat starts dim and brightens as the
- * pointer lingers. */
-export const DYE_INTENSITY = 0.25;
-
-/** A fully-saturated colour at hue `h` (0..1) — the HSV-to-RGB conversion with
- * s = v = 1, which keeps successive splats vivid rather than averaging to grey. */
-export const hueToRgb = (h: number): [number, number, number] => {
-  const channel = (offset: number): number => {
-    const position = (h * 6 + offset) % 6;
-    return Math.max(0, Math.min(1, Math.min(position, 4 - position, 1)));
-  };
-  return [
-    channel(2) * DYE_INTENSITY,
-    channel(0) * DYE_INTENSITY,
-    channel(4) * DYE_INTENSITY,
-  ];
-};
-
-export const randomColor = (): [number, number, number] =>
-  hueToRgb(Math.random());
+import type { Splat } from "./types";
 
 /**
  * Tracks the pointer in normalised canvas space and produces the per-frame
@@ -60,21 +40,21 @@ export class PointerTracker {
     this.active = false;
   }
 
-  /** Read the frame's input and clear it. `down` reports whether there is
-   * input to splat, not whether the button is still held: a drag completed
-   * between two frames would otherwise be dropped entirely. */
-  consume(): Pointer {
-    const sample: Pointer = {
+  /** Read the frame's input and clear it. A drag that began and ended between
+   * two frames still yields a splat — its motion has never been rendered. */
+  consume(): Splat | null {
+    if (!this.active && !this.pending) return null;
+
+    const splat: Splat = {
       x: this.x,
       y: this.y,
       dx: this.dx,
       dy: this.dy,
-      down: this.active || this.pending,
       color: this.color,
     };
     this.dx = 0;
     this.dy = 0;
     this.pending = false;
-    return sample;
+    return splat;
   }
 }
