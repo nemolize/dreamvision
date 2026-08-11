@@ -1,45 +1,35 @@
 /**
- * The projection's discretisation, as plain numbers.
+ * How the projection's three passes convert between stored velocity and the
+ * grid. They only compose into a Helmholtz projection if they agree on it, and
+ * that agreement is a property of the numbers rather than of any GPU state —
+ * which is what lets `projection.test.ts` check the operators on the CPU, with
+ * no adapter.
  *
- * The three projection passes (`divergence`, `pressure`, `gradientSubtract`)
- * compose into a real Helmholtz projection only if their per-axis scale
- * factors agree. That agreement is a property of the numbers, not of any GPU
- * state, so the numbers live here rather than inside the shader — which is
- * what lets `projection.test.ts` check the operator identities on the CPU,
- * with no adapter.
+ * Velocity is stored normalised per axis, so `vx = 1` crosses the full canvas
+ * width in a second and `vy = 1` the full height; `advect` reads it that way,
+ * multiplying each component by its own grid dimension. Cells are square, so a
+ * component's speed in cells is its value times the cell count along its axis.
  *
- * Velocity is stored in normalised units per second — the canvas spans 0..1 on
- * *each* axis independently, so `vx = 1` crosses the full width in a second
- * while `vy = 1` crosses the full height. `advect` is what fixes that reading:
- * it converts to cell offsets by multiplying each component by that grid's own
- * dimension, so one unit of `vx` covers `width` cells and one unit of `vy`
- * covers `height` cells.
- *
- * Cells are square — `fitGrid` sees to that — so a cell is the natural unit of
- * length here, and the physical speed of a velocity component is its value
- * times the cell count along its axis. Hence the per-axis weights below: the x
- * difference carries `width`, the y difference `height`. Summing them with
- * equal weight, as the passes did before #681, under-counts x by the aspect
- * ratio — 44% on a 16:9 canvas.
- *
- * Confining the conversion to these three passes leaves advection, the splat,
- * and the pointer in the units they already had.
+ * The conversion runs both ways and the two are reciprocal: `divergence` reads
+ * stored velocity and reports a rate in cells, so it multiplies;
+ * `gradientSubtract` computes a correction in cells and writes it back as
+ * stored velocity, so it divides. Weighting both alike — the state this file
+ * was added to fix — leaves the projection anisotropic in the correction while
+ * the divergence it reports still falls, so only the written velocity reveals
+ * it. The two cancel in between, which is why the Jacobi sweep inverts the
+ * plain 5-point Laplacian with no weights of its own.
  */
 
 /** Per-axis factors the three projection passes must agree on. */
 export interface ProjectionScale {
-  /** Multiplies the x difference in `divergence`. */
+  /** Stored velocity to cells per second, for `divergence`'s x difference. */
   divergenceX: number;
-  /** Multiplies the y difference in `divergence`. */
+  /** Stored velocity to cells per second, for `divergence`'s y difference. */
   divergenceY: number;
-  /** Multiplies the x pressure difference in `gradientSubtract`. */
+  /** Cells per second back to stored, for `gradientSubtract`'s x correction. */
   gradientX: number;
-  /** Multiplies the y pressure difference in `gradientSubtract`. */
+  /** Cells per second back to stored, for `gradientSubtract`'s y correction. */
   gradientY: number;
-  /** Weights the x neighbours in the Jacobi sweep's Laplacian. */
-  laplacianX: number;
-  /** Weights the y neighbours in the Jacobi sweep's Laplacian. */
-  laplacianY: number;
 }
 
 export const projectionScale = (
@@ -48,12 +38,6 @@ export const projectionScale = (
 ): ProjectionScale => ({
   divergenceX: width,
   divergenceY: height,
-  gradientX: width,
-  gradientY: height,
-  laplacianX: width * width,
-  laplacianY: height * height,
+  gradientX: 1 / width,
+  gradientY: 1 / height,
 });
-
-/** What the Jacobi sweep's weighted mean of the neighbours divides by. */
-export const jacobiDiagonal = (scale: ProjectionScale): number =>
-  2 * (scale.laplacianX + scale.laplacianY);

@@ -58,18 +58,21 @@ Textures are 32-bit float: WebGPU guarantees write-only storage access for
 those formats, while the 16-bit forms need an optional feature. They are not
 filterable in exchange, so the shaders interpolate by hand.
 
-The projection's per-axis scale factors are derived in `src/fluid/projection.ts`
-rather than written into the shader, so `projection.test.ts` can check the
-operators' identities on the CPU — the solver itself needs a GPU adapter, which
-makes those factors the one part of it a unit test can reach.
+The conversion between stored velocity and grid cells is derived in
+`src/fluid/projection.ts` rather than written into the shader, so
+`projection.test.ts` can check the operators on the CPU — the shaders need a
+GPU adapter, which makes those numbers the one part of the solver a unit test
+can reach.
 
 One deviation from a textbook solver remains: `divergence` and
 `gradientSubtract` use central differences while the Jacobi sweep solves a
 1-cell Laplacian, so the sweep does not invert the operator whose divergence it
-is given. Measured at the grid size actually used, matching the stencils only
-starts to pay off past a few hundred sweeps — well beyond the 32 the frame loop
-runs — and doing it properly means moving the velocity components onto cell
-faces, which advection and the splat would have to follow. Tracked in
+is given. Matching the stencils turns out to buy almost nothing here — measured
+at the grid size actually used, and letting the pressure field carry over
+between frames as it does on the GPU, the two schemes land within a tenth of a
+point of each other however long they run. Doing it properly also means moving
+the velocity components onto cell faces, which advection and the splat would
+have to follow. Tracked in
 [#681](https://github.com/nemolize/dreamvision/issues/681).
 
 ## Project layout

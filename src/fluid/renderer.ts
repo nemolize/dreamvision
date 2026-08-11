@@ -9,7 +9,7 @@ import {
   WORKGROUP_SIZE,
 } from "./config";
 import type { ProjectionScale } from "./projection";
-import { jacobiDiagonal, projectionScale } from "./projection";
+import { projectionScale } from "./projection";
 import renderShaderSource from "./render.wgsl?raw";
 import simulationShaderSource from "./simulation.wgsl?raw";
 import type { FluidRenderer, Pointer } from "./types";
@@ -25,15 +25,11 @@ const UNIFORM = {
   splatRadius: 13,
   splatActive: 14,
   aspect: 15,
-  // `divergence` and `gradientSubtract` share one pair: both differentiate
-  // once, so both scale by the reciprocal cell size. `projection.test.ts`
-  // asserts they stay equal.
-  differenceScale: 16,
-  laplacianScale: 18,
-  jacobiDiagonal: 20,
+  toCells: 16,
+  toStored: 18,
 } as const;
 
-const UNIFORM_FLOATS = 24;
+const UNIFORM_FLOATS = 20;
 const UNIFORM_BYTES = UNIFORM_FLOATS * 4;
 
 const PARAM_BYTES = 16;
@@ -456,15 +452,8 @@ export const createFluidRenderer = (
     uniformData[UNIFORM.splatRadius] = SPLAT_RADIUS;
     uniformData[UNIFORM.splatActive] = pointer.down ? 1 : 0;
     uniformData[UNIFORM.aspect] = dyeGrid.width / dyeGrid.height;
-    uniformData.set(
-      [scale.divergenceX, scale.divergenceY],
-      UNIFORM.differenceScale,
-    );
-    uniformData.set(
-      [scale.laplacianX, scale.laplacianY],
-      UNIFORM.laplacianScale,
-    );
-    uniformData[UNIFORM.jacobiDiagonal] = jacobiDiagonal(scale);
+    uniformData.set([scale.divergenceX, scale.divergenceY], UNIFORM.toCells);
+    uniformData.set([scale.gradientX, scale.gradientY], UNIFORM.toStored);
 
     device.queue.writeBuffer(uniformBuffer, 0, uniformData);
 
