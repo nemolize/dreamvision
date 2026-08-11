@@ -25,10 +25,9 @@ pnpm install
 pnpm dev
 ```
 
-`mise install` has to come first because pnpm itself comes from mise; there is
-no other step here that needs it. Git hooks are installed by `pnpm install`
-through its `prepare` script, which runs the `lefthook` binary out of
-`node_modules`, so they need nothing on your `PATH`.
+`mise install` has to come first: everything after it runs on the Node.js and
+pnpm it puts on your `PATH`. Git hooks install themselves as part of
+`pnpm install`.
 
 ## How it works
 
