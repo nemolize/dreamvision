@@ -58,10 +58,24 @@ Textures are 32-bit float: WebGPU guarantees write-only storage access for
 those formats, while the 16-bit forms need an optional feature. They are not
 filterable in exchange, so the shaders interpolate by hand.
 
-Two known deviations from a textbook solver — an anisotropic projection on
-non-square viewports, and divergence/pressure stencils that do not match — are
-tracked in [#681](https://github.com/nemolize/dreamvision/issues/681). Neither
-breaks the simulation; they affect how it feels.
+The conversion between stored velocity and grid cells is derived in
+`src/fluid/projection.ts` rather than written into the shader, so
+`projection.test.ts` can check the operators on the CPU — the shaders need a
+GPU adapter, which makes those numbers the one part of the solver a unit test
+can reach.
+
+One deviation from a textbook solver remains: `divergence` and
+`gradientSubtract` use central differences while the Jacobi sweep solves a
+1-cell Laplacian, so the sweep does not invert the operator whose divergence it
+is given. From a cold start, enough sweeps would make that cost real accuracy —
+but this solver never solves cold: the pressure field carries over between
+frames, so each solve resumes the last one, and what survives is dominated by
+the low frequencies the sweep is slow on rather than by the stencil. Measured
+that way the two schemes converge on each other as the loop runs, to within a
+tenth of a point. Doing it properly also means moving the velocity components
+onto cell faces, which advection and the splat would have to follow. Numbers and
+the options are in
+[#681](https://github.com/nemolize/dreamvision/issues/681).
 
 ## Project layout
 
@@ -87,14 +101,23 @@ breaks the simulation; they affect how it feels.
 
 ### Testing notes
 
-The solver itself has no unit tests: it needs a real GPU adapter, which Node
-has no implementation of. Its coverage comes from the Playwright suite, which
+The shaders cannot be unit-tested: they need a real GPU adapter, which Node has
+no implementation of. Their coverage comes from the Playwright suite, which
 drives a real drag and then asserts the picture keeps changing after the
 pointer is released. That second assertion is the load-bearing one: lit pixels
 alone prove nothing, since the splat pass writes colour straight under the
 drag path — only advection over a projected velocity field keeps the field
 moving with no further input. Verified by disabling advection and confirming
 the suite fails.
+
+What that suite cannot see is whether the projection is _right_: a wrong sign,
+a swapped axis, or a missing per-axis weight still leaves something that looks
+like a fluid. `projection.test.ts` covers that gap by rebuilding the discrete
+operators from the factors in `projection.ts` and checking the identities they
+have to satisfy. It is a check on the derivation, not on the shader — the
+operators are transcribed by hand, so editing a projection pass means editing
+its twin in the test. Verified by mutation: reverting each factor to a wrong
+value fails at least one assertion.
 
 E2E runs against the Vite dev server by default; in CI (and with `E2E_PREVIEW=1`
 locally) it runs against the production build served by the Workers runtime.

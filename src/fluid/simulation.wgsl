@@ -7,16 +7,25 @@
 // `Uniforms` is padded to 16-byte alignment by hand and holds no vec3: vec3
 // padding in a host-shared struct is driver-fragile, so every field is either
 // a scalar or a vec4.
+//
+// The three projection passes have a hand-written CPU twin in
+// `projection.test.ts`, which is where their arithmetic is actually checked —
+// editing one of them means editing it there too.
 
 struct Uniforms {
   simSize: vec2f,      // velocity grid, in cells
   splatPoint: vec2f,   // normalised 0..1, origin top-left
-  splatDelta: vec2f,   // pointer motion, normalised units per second
+  splatDelta: vec2f,   // pointer travel this frame x SPLAT_FORCE, not a rate
   splatColor: vec4f,
   dt: f32,
   splatRadius: f32,    // divides squared distance, so a squared length
   splatActive: f32,    // 1 when there is input to splat, 0 otherwise
   aspect: f32,         // width / height, keeps splats circular
+  // The projection's metric, derived host-side in `projection.ts`. The two are
+  // reciprocals — stored velocity to cells per second and back — so they cancel
+  // across the solve and the Jacobi sweep needs no weights of its own.
+  toCells: vec2f,
+  toStored: vec2f,
 }
 
 @group(0) @binding(0) var<uniform> u: Uniforms;
@@ -43,14 +52,14 @@ fn sampleAt(tex: texture_2d<f32>, size: vec2f, cell: vec2f) -> vec4f {
   return mix(mix(c00, c10, frac.x), mix(c01, c11, frac.x), frac.y);
 }
 
-/// Free-slip walls: the boundary cell mirrors its inward neighbour with the
-/// normal component negated, so fluid slides along the edge instead of
-/// leaking through it.
-fn velocityBoundaryScale(id: vec2u, size: vec2u) -> vec2f {
-  var scale = vec2f(1.0, 1.0);
-  if (id.x == 0u || id.x == size.x - 1u) { scale.x = -1.0; }
-  if (id.y == 0u || id.y == size.y - 1u) { scale.y = -1.0; }
-  return scale;
+/// Free-slip walls: no flow crosses the edge, so the component normal to it is
+/// dropped while the tangential one slides along untouched. Negating the normal
+/// component instead would keep its magnitude and merely reverse the leak.
+fn applyVelocityBoundary(velocity: vec2f, id: vec2u, size: vec2u) -> vec2f {
+  var bounded = velocity;
+  if (id.x == 0u || id.x == size.x - 1u) { bounded.x = 0.0; }
+  if (id.y == 0u || id.y == size.y - 1u) { bounded.y = 0.0; }
+  return bounded;
 }
 
 // ---------------------------------------------------------------- advection
@@ -111,7 +120,9 @@ fn divergence(@builtin(global_invocation_id) gid: vec3u) {
   if (gid.y == 0u) { down = -centre.y; }
   if (gid.y == size.y - 1u) { up = -centre.y; }
 
-  textureStore(divergenceOutput, gid.xy, vec4f(0.5 * (right - left + up - down), 0.0, 0.0, 1.0));
+  let divergenceValue =
+    0.5 * u.toCells.x * (right - left) + 0.5 * u.toCells.y * (up - down);
+  textureStore(divergenceOutput, gid.xy, vec4f(divergenceValue, 0.0, 0.0, 1.0));
 }
 
 // ------------------------------------------------------------------ pressure
@@ -156,8 +167,9 @@ fn gradientSubtract(@builtin(global_invocation_id) gid: vec3u) {
   let up = sampleAt(gradientPressure, u.simSize, cell + vec2f(0.0, 1.0)).x;
 
   let velocity = sampleAt(gradientVelocity, u.simSize, cell).xy;
-  let projected = velocity - 0.5 * vec2f(right - left, up - down);
-  let bounded = projected * velocityBoundaryScale(gid.xy, size);
+  let gradient = 0.5 * u.toStored * vec2f(right - left, up - down);
+  let projected = velocity - gradient;
+  let bounded = applyVelocityBoundary(projected, gid.xy, size);
 
   textureStore(gradientOutput, gid.xy, vec4f(bounded, 0.0, 1.0));
 }

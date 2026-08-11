@@ -2,7 +2,9 @@ export interface Pointer {
   /** Normalised position, origin top-left. */
   x: number;
   y: number;
-  /** Motion since the previous frame, in normalised units per second. */
+  /** Normalised travel accumulated since the last `consume`, scaled by
+   * `SPLAT_FORCE` — a displacement, not a rate; nothing divides it by elapsed
+   * time. */
   dx: number;
   dy: number;
   down: boolean;
