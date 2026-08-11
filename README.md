@@ -67,13 +67,14 @@ can reach.
 One deviation from a textbook solver remains: `divergence` and
 `gradientSubtract` use central differences while the Jacobi sweep solves a
 1-cell Laplacian, so the sweep does not invert the operator whose divergence it
-is given. Matching the stencils turns out to buy almost nothing here — measured
-at the grid size actually used, and letting the pressure field carry over
-between frames as it does on the GPU, the two schemes land within a tenth of a
-point of each other however long they run. Doing it properly also means moving
-the velocity components onto cell faces, which advection and the splat would
-have to follow. Tracked in
-[#681](https://github.com/nemolize/dreamvision/issues/681).
+is given. Given enough sweeps from a cold start that costs real accuracy, but
+this solver never gets there: the pressure field carries over between frames, so
+each solve resumes the last one, and what survives is dominated by the low
+frequencies the sweep is slow on rather than by the stencil. Measured that way
+the two schemes stay within a tenth of a point of each other however long they
+run. Doing it properly also means moving the velocity components onto cell
+faces, which advection and the splat would have to follow. Numbers and the
+options are in [#681](https://github.com/nemolize/dreamvision/issues/681).
 
 ## Project layout
 
