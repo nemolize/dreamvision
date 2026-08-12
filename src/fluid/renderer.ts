@@ -154,8 +154,18 @@ export const createFluidRenderer = (
         visibility: GPUShaderStage.COMPUTE,
         buffer: { type: "uniform" },
       },
+    ],
+  });
+
+  const sharedBindGroup = device.createBindGroup({
+    layout: sharedLayout,
+    entries: [{ binding: 0, resource: { buffer: uniformBuffer } }],
+  });
+
+  const splatUniformLayout = device.createBindGroupLayout({
+    entries: [
       {
-        binding: 1,
+        binding: 0,
         visibility: GPUShaderStage.COMPUTE,
         buffer: {
           type: "uniform",
@@ -166,16 +176,12 @@ export const createFluidRenderer = (
     ],
   });
 
-  const sharedBindGroup = device.createBindGroup({
-    layout: sharedLayout,
+  const splatUniformBindGroup = device.createBindGroup({
+    layout: splatUniformLayout,
     entries: [
-      { binding: 0, resource: { buffer: uniformBuffer } },
       {
-        binding: 1,
-        resource: {
-          buffer: splatBuffer,
-          size: SPLAT_UNIFORM_FLOATS * 4,
-        },
+        binding: 0,
+        resource: { buffer: splatBuffer, size: SPLAT_UNIFORM_FLOATS * 4 },
       },
     ],
   });
@@ -218,11 +224,15 @@ export const createFluidRenderer = (
   const computePipeline = (
     entryPoint: string,
     passLayout: GPUBindGroupLayout,
+    splatUniforms?: GPUBindGroupLayout,
   ): GPUComputePipeline =>
     device.createComputePipeline({
       label: entryPoint,
       layout: device.createPipelineLayout({
-        bindGroupLayouts: [sharedLayout, passLayout],
+        bindGroupLayouts:
+          splatUniforms === undefined
+            ? [sharedLayout, passLayout]
+            : [sharedLayout, passLayout, splatUniforms],
       }),
       compute: { module: simulationModule, entryPoint },
     });
@@ -232,7 +242,7 @@ export const createFluidRenderer = (
     divergence: computePipeline("divergence", divergenceLayout),
     pressure: computePipeline("pressure", pressureLayout),
     gradientSubtract: computePipeline("gradientSubtract", gradientLayout),
-    splat: computePipeline("splat", splatLayout),
+    splat: computePipeline("splat", splatLayout, splatUniformLayout),
   };
 
   const renderLayout = device.createBindGroupLayout({
@@ -506,7 +516,7 @@ export const createFluidRenderer = (
 
     const encoder = device.createCommandEncoder();
     const pass = encoder.beginComputePass();
-    pass.setBindGroup(0, sharedBindGroup, [0]);
+    pass.setBindGroup(0, sharedBindGroup);
 
     const simDispatch = dispatchSize(simGrid);
     const dyeDispatch = dispatchSize(dyeGrid);
@@ -533,7 +543,7 @@ export const createFluidRenderer = (
     // both grids, so the frame's cost grows with their count — the seed burst
     // is deliberately a one-off.
     applied.forEach((_, index) => {
-      pass.setBindGroup(0, sharedBindGroup, [index * splatSlotBytes]);
+      pass.setBindGroup(2, splatUniformBindGroup, [index * splatSlotBytes]);
 
       run(
         pipelines.splat,

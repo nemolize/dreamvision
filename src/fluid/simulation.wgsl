@@ -23,21 +23,7 @@ struct Uniforms {
   toStored: vec2f,
 }
 
-/// One splat's own parameters. Separate from `Uniforms` because a frame injects
-/// any number of splats — each dispatch selects its own slot by dynamic offset,
-/// so they cannot be folded into the per-frame block.
-struct SplatUniforms {
-  point: vec2f,        // normalised 0..1, origin top-left
-  delta: vec2f,        // a displacement rather than a rate
-  color: vec4f,
-  radius: f32,         // divides squared distance, so a squared length
-  _pad0: f32,
-  _pad1: f32,
-  _pad2: f32,
-}
-
 @group(0) @binding(0) var<uniform> u: Uniforms;
-@group(0) @binding(1) var<uniform> s: SplatUniforms;
 
 /// Read one texel, clamping to the edge so out-of-range reads mirror the
 /// wall's value rather than wrapping to the far side of the grid.
@@ -191,9 +177,25 @@ struct SplatParams {
   _pad: f32,
 }
 
+/// One splat's own parameters. Separate from `Uniforms` because a frame injects
+/// any number of splats — each dispatch selects its own slot by dynamic offset,
+/// so they cannot be folded into the per-frame block.
+struct SplatUniforms {
+  point: vec2f,        // normalised 0..1, origin top-left
+  delta: vec2f,        // a displacement rather than a rate
+  color: vec4f,
+  radius: f32,         // divides squared distance, so a squared length
+  _pad0: f32,
+  _pad1: f32,
+  _pad2: f32,
+}
+
 @group(1) @binding(0) var splatSource: texture_2d<f32>;
 @group(1) @binding(1) var splatOutput: texture_storage_2d<rgba32float, write>;
 @group(1) @binding(2) var<uniform> splatParams: SplatParams;
+
+// Its own group, so the passes that never read a splat are not made to bind one.
+@group(2) @binding(0) var<uniform> s: SplatUniforms;
 
 /// Add a gaussian blob of force or colour at the splat's point.
 @compute @workgroup_size(WORKGROUP_SIZE, WORKGROUP_SIZE)
