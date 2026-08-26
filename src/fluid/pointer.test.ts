@@ -74,6 +74,25 @@ describe("PointerTracker", () => {
     expect(tracker.consume()).toBeNull();
   });
 
+  it("scales the splat by the force set on it", () => {
+    const tracker = new PointerTracker();
+    tracker.setForce(10);
+    tracker.press(0.5, 0.5);
+    tracker.move(0.6, 0.5);
+
+    expect(splatted(tracker.consume()).dx).toBeCloseTo(0.1 * 10, 6);
+  });
+
+  it("applies a force changed mid-drag to the motion already accumulated", () => {
+    const tracker = new PointerTracker();
+    tracker.setForce(10);
+    tracker.press(0.5, 0.5);
+    tracker.move(0.6, 0.5);
+    tracker.setForce(20);
+
+    expect(splatted(tracker.consume()).dx).toBeCloseTo(0.1 * 20, 6);
+  });
+
   it("does not carry motion across a press", () => {
     const tracker = new PointerTracker();
     tracker.press(0.1, 0.1);

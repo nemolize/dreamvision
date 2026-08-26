@@ -17,6 +17,11 @@ export class PointerTracker {
    * if the pointer has been released since. */
   private pending = false;
   private color = randomColor();
+  private force = SPLAT_FORCE;
+
+  setForce(force: number): void {
+    this.force = force;
+  }
 
   press(x: number, y: number): void {
     this.x = x;
@@ -29,8 +34,8 @@ export class PointerTracker {
 
   move(x: number, y: number): void {
     if (!this.active) return;
-    this.dx += (x - this.x) * SPLAT_FORCE;
-    this.dy += (y - this.y) * SPLAT_FORCE;
+    this.dx += x - this.x;
+    this.dy += y - this.y;
     this.x = x;
     this.y = y;
     this.pending = true;
@@ -48,8 +53,8 @@ export class PointerTracker {
     const splat: Splat = {
       x: this.x,
       y: this.y,
-      dx: this.dx,
-      dy: this.dy,
+      dx: this.dx * this.force,
+      dy: this.dy * this.force,
       color: this.color,
     };
     this.dx = 0;

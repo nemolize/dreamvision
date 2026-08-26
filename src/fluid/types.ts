@@ -1,3 +1,5 @@
+import type { FluidSettings } from "./settings";
+
 /** One blob of force and colour injected into the fields. */
 export interface Splat {
   /** Normalised position, origin top-left. */
@@ -12,6 +14,7 @@ export interface Splat {
 export interface FluidRenderer {
   /** Advance and draw one frame, injecting each splat before the projection. */
   frame: (splats: readonly Splat[]) => void;
+  applySettings: (settings: FluidSettings) => void;
   resize: (width: number, height: number) => void;
   destroy: () => void;
 }
