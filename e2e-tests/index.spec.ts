@@ -26,6 +26,12 @@ const stir = async (
 /** Columns each screenshot is downsampled to. */
 const SAMPLE_WIDTH = 64;
 
+/** The settings toggle sits over the canvas, and an element screenshot
+ * composites it in — its lit corner otherwise counts as dye. */
+const hideSettings = async (page: Page): Promise<void> => {
+  await page.addStyleTag({ content: ".settings { display: none; }" });
+};
+
 /** Read through a screenshot because a WebGPU canvas does not preserve its
  * drawing buffer: `drawImage` onto a 2D canvas returns transparent black. */
 const sampleCanvas = async (page: Page): Promise<number[]> => {
@@ -55,6 +61,12 @@ const sampleCanvas = async (page: Page): Promise<number[]> => {
     },
     { url: dataUrl, width: SAMPLE_WIDTH },
   );
+};
+
+const meanBrightness = async (page: Page): Promise<number> => {
+  const pixels = await sampleCanvas(page);
+  if (pixels.length === 0) return -1;
+  return pixels.reduce((sum, value) => sum + value, 0) / pixels.length;
 };
 
 const litFraction = async (page: Page): Promise<number> => {
@@ -92,13 +104,109 @@ test.describe("fluid canvas", () => {
     expect(box?.height).toBeCloseTo(viewport?.height ?? 0, 0);
   });
 
-  test("renders no controls over the canvas", async ({ page }) => {
+  test("keeps the settings panel collapsed until it is opened", async ({
+    page,
+  }) => {
     await page.goto("/");
     await expect(page.getByLabel("Fluid simulation")).toBeVisible();
 
-    await expect(page.getByRole("button")).toHaveCount(0);
+    await expect(page.getByRole("button")).toHaveCount(1);
     await expect(page.getByRole("slider")).toHaveCount(0);
     await expect(page.getByRole("heading")).toHaveCount(0);
+
+    await page.getByRole("button", { name: "Open settings" }).click();
+
+    await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
+    await expect(page.getByRole("slider")).toHaveCount(5);
+  });
+
+  test("restores a changed setting after a reload, and drops it on reset", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    await page.getByRole("button", { name: "Open settings" }).click();
+
+    const force = page.getByRole("slider", { name: "Splat force" });
+    const initial = await force.inputValue();
+    await force.fill("77");
+
+    await page.reload();
+    await page.getByRole("button", { name: "Open settings" }).click();
+    await expect(page.getByRole("slider", { name: "Splat force" })).toHaveValue(
+      "77",
+    );
+
+    await page.getByRole("button", { name: "Reset" }).click();
+    await page.reload();
+    await page.getByRole("button", { name: "Open settings" }).click();
+    await expect(page.getByRole("slider", { name: "Splat force" })).toHaveValue(
+      initial,
+    );
+  });
+
+  test("stores a setting on its own, without waiting for the page to hide", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    await page.evaluate(() => {
+      window.localStorage.clear();
+    });
+    await page.goto("/");
+    await page.getByRole("button", { name: "Open settings" }).click();
+    await page.getByRole("slider", { name: "Splat force" }).fill("64");
+
+    // Read from the live page because a reload flushes the pending write on its
+    // way out, and would pass even if the debounce never fired.
+    await expect
+      .poll(() =>
+        page.evaluate(() =>
+          window.localStorage.getItem("dreamvision.settings"),
+        ),
+      )
+      .toContain('"splatForce":64');
+  });
+
+  test("carries the dye decay slider through to the solver", async ({
+    page,
+  }) => {
+    // Two full simulation runs, each settling for seconds against CI's software
+    // renderer, so the default 30s ceiling is not enough.
+    test.setTimeout(180_000);
+
+    const retentionAtDecay = async (decay: string): Promise<number> => {
+      await page.goto("/?seed=off");
+      await page.evaluate(() => {
+        window.localStorage.clear();
+      });
+      await page.goto("/?seed=off");
+      await expect(page.getByRole("alert")).toHaveCount(0);
+
+      await page.getByRole("button", { name: "Open settings" }).click();
+      await page.getByRole("slider", { name: "Dye decay" }).fill(decay);
+      await hideSettings(page);
+
+      const viewport = page.viewportSize() ?? { width: 1280, height: 720 };
+      await stir(page, viewport);
+
+      // Elapsed time is the variable under test — decay is a rate — so these
+      // wait for a fixed span rather than for a condition to become true.
+      /* eslint-disable playwright/no-wait-for-timeout */
+      await page.waitForTimeout(1000);
+      const before = await meanBrightness(page);
+      expect(before).toBeGreaterThan(0);
+
+      await page.waitForTimeout(4000);
+      /* eslint-enable playwright/no-wait-for-timeout */
+      return (await meanBrightness(page)) / before;
+    };
+
+    // Nothing below the GPU boundary is observable from the DOM, so the dye's
+    // own fade rate is the only evidence the slider's value arrived.
+    const slow = await retentionAtDecay("0");
+    const fast = await retentionAtDecay("3");
+
+    expect(slow).toBeGreaterThan(0.5);
+    expect(fast).toBeLessThan(0.2);
   });
 
   test("starts the GPU simulation and paints dye where the pointer drags", async ({
@@ -115,6 +223,7 @@ test.describe("fluid canvas", () => {
 
     const canvas = page.getByLabel("Fluid simulation");
     await expect(canvas).toBeVisible();
+    await hideSettings(page);
 
     // An adapter-less environment renders the notice instead; failing here
     // rather than skipping keeps a silently broken simulation from passing.
@@ -150,6 +259,7 @@ test.describe("fluid canvas", () => {
     await page.goto("/");
     await expect(page.getByLabel("Fluid simulation")).toBeVisible();
     await expect(page.getByRole("alert")).toHaveCount(0);
+    await hideSettings(page);
 
     // Nothing touches the pointer, and the sibling test above shows the canvas
     // stays black without the burst — so this lights up only if it ran. Polled

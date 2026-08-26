@@ -22,6 +22,99 @@ canvas {
   cursor: crosshair;
 }
 
+.settings {
+  position: fixed;
+  top: 1rem;
+  right: 1rem;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.5rem;
+  color: #e8eaed;
+  font:
+    0.8125rem/1.4 system-ui,
+    sans-serif;
+}
+
+.settings__toggle {
+  width: 2.5rem;
+  height: 2.5rem;
+  border: 1px solid #ffffff26;
+  border-radius: 50%;
+  background: #000000a6;
+  color: inherit;
+  font-size: 1.125rem;
+  line-height: 1;
+  cursor: pointer;
+  backdrop-filter: blur(8px);
+}
+
+.settings__toggle:hover {
+  background: #000000d9;
+}
+
+.settings__panel {
+  display: grid;
+  gap: 0.75rem;
+  width: min(20rem, calc(100vw - 2rem));
+  padding: 1rem;
+  border: 1px solid #ffffff26;
+  border-radius: 0.75rem;
+  background: #000000d9;
+  backdrop-filter: blur(8px);
+}
+
+.settings__title {
+  margin: 0;
+  font-size: 0.875rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #9aa0a6;
+}
+
+.settings__row {
+  display: grid;
+  grid-template-areas:
+    "label value"
+    "slider slider";
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 0.25rem 0.5rem;
+}
+
+.settings__label {
+  grid-area: label;
+}
+
+.settings__row input[type="range"] {
+  grid-area: slider;
+  width: 100%;
+  accent-color: #8ab4f8;
+  cursor: pointer;
+}
+
+.settings__value {
+  grid-area: value;
+  font-variant-numeric: tabular-nums;
+  color: #9aa0a6;
+}
+
+.settings__reset {
+  justify-self: start;
+  padding: 0.375rem 0.75rem;
+  border: 1px solid #ffffff26;
+  border-radius: 0.375rem;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.settings__reset:hover {
+  background: #ffffff14;
+}
+
 .notice {
   display: flex;
   height: 100%;

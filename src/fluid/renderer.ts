@@ -1,17 +1,15 @@
 import {
-  DYE_DISSIPATION,
   DYE_RESOLUTION,
   MAX_SPLATS_PER_FRAME,
-  PRESSURE_ITERATIONS,
   SIM_RESOLUTION,
-  SPLAT_RADIUS,
   TIME_STEP,
-  VELOCITY_DISSIPATION,
   WORKGROUP_SIZE,
 } from "./config";
 import type { ProjectionScale } from "./projection";
 import { projectionScale, projectionUniform } from "./projection";
 import renderShaderSource from "./render.wgsl?raw";
+import type { FluidSettings } from "./settings";
+import { DEFAULT_SETTINGS } from "./settings";
 import simulationShaderSource from "./simulation.wgsl?raw";
 import type { FluidRenderer, Splat } from "./types";
 
@@ -38,6 +36,11 @@ const SPLAT_UNIFORM = {
 } as const;
 
 const SPLAT_UNIFORM_FLOATS = 12;
+
+const ADVECT_PARAM = {
+  gridSize: 0,
+  dissipation: 2,
+} as const;
 
 const PARAM_BYTES = 16;
 
@@ -278,6 +281,14 @@ export const createFluidRenderer = (
     return buffer;
   };
 
+  const makeAdvectParams = (grid: Grid, dissipation: number): GPUBuffer => {
+    const values = new Array<number>(PARAM_BYTES / 4).fill(0);
+    values[ADVECT_PARAM.gridSize] = grid.width;
+    values[ADVECT_PARAM.gridSize + 1] = grid.height;
+    values[ADVECT_PARAM.dissipation] = dissipation;
+    return makeParamBuffer(values);
+  };
+
   /** One bind group per face the source buffer may be on, indexed by that
    * face — the pressure solve alone would otherwise build one per sweep. */
   type FacePair = readonly [GPUBindGroup, GPUBindGroup];
@@ -291,7 +302,9 @@ export const createFluidRenderer = (
     dye: DoubleBuffer;
     pressure: DoubleBuffer;
     divergence: GPUTexture;
-    paramBuffers: readonly GPUBuffer[];
+    ownedParamBuffers: readonly GPUBuffer[];
+    advectVelocityParams: GPUBuffer;
+    advectDyeParams: GPUBuffer;
     advectVelocity: FacePair;
     /** Indexed by velocity face, then dye face: dye advection reads both. */
     advectDye: readonly [FacePair, FacePair];
@@ -305,6 +318,7 @@ export const createFluidRenderer = (
   }
 
   let resources: Resources | null = null;
+  let settings: FluidSettings = DEFAULT_SETTINGS;
 
   const buildResources = (
     canvasWidth: number,
@@ -325,18 +339,11 @@ export const createFluidRenderer = (
     });
     const divergenceView = divergence.createView();
 
-    const advectVelocityParams = makeParamBuffer([
-      simGrid.width,
-      simGrid.height,
-      VELOCITY_DISSIPATION,
-      0,
-    ]);
-    const advectDyeParams = makeParamBuffer([
-      dyeGrid.width,
-      dyeGrid.height,
-      DYE_DISSIPATION,
-      0,
-    ]);
+    const advectVelocityParams = makeAdvectParams(
+      simGrid,
+      settings.velocityDissipation,
+    );
+    const advectDyeParams = makeAdvectParams(dyeGrid, settings.dyeDissipation);
     const splatVelocityParams = makeParamBuffer([
       simGrid.width,
       simGrid.height,
@@ -452,12 +459,14 @@ export const createFluidRenderer = (
       dye,
       pressure,
       divergence,
-      paramBuffers: [
+      ownedParamBuffers: [
         advectVelocityParams,
         advectDyeParams,
         splatVelocityParams,
         splatDyeParams,
       ],
+      advectVelocityParams,
+      advectDyeParams,
       advectVelocity,
       advectDye,
       splatVelocity,
@@ -474,12 +483,27 @@ export const createFluidRenderer = (
     current.dye.destroy();
     current.pressure.destroy();
     current.divergence.destroy();
-    for (const buffer of current.paramBuffers) buffer.destroy();
+    for (const buffer of current.ownedParamBuffers) buffer.destroy();
   };
 
   const resize = (canvasWidth: number, canvasHeight: number): void => {
     if (resources !== null) releaseResources(resources);
     resources = buildResources(canvasWidth, canvasHeight);
+  };
+
+  const writeDissipation = (buffer: GPUBuffer, rate: number): void => {
+    device.queue.writeBuffer(
+      buffer,
+      ADVECT_PARAM.dissipation * 4,
+      new Float32Array([rate]),
+    );
+  };
+
+  const applySettings = (next: FluidSettings): void => {
+    settings = next;
+    if (resources === null) return;
+    writeDissipation(resources.advectVelocityParams, next.velocityDissipation);
+    writeDissipation(resources.advectDyeParams, next.dyeDissipation);
   };
 
   resize(width, height);
@@ -504,7 +528,7 @@ export const createFluidRenderer = (
       splatData.set([splat.x, splat.y], SPLAT_UNIFORM.point);
       splatData.set([splat.dx, splat.dy], SPLAT_UNIFORM.delta);
       splatData.set(splat.color, SPLAT_UNIFORM.color);
-      splatData[SPLAT_UNIFORM.radius] = SPLAT_RADIUS;
+      splatData[SPLAT_UNIFORM.radius] = settings.splatRadius;
       device.queue.writeBuffer(
         splatBuffer,
         index * splatSlotBytes,
@@ -563,7 +587,7 @@ export const createFluidRenderer = (
       simDispatch,
     );
 
-    for (let i = 0; i < PRESSURE_ITERATIONS; i++) {
+    for (let i = 0; i < settings.pressureIterations; i++) {
       run(
         pipelines.pressure,
         current.pressurePass[pressure.readFace],
@@ -608,6 +632,7 @@ export const createFluidRenderer = (
 
   return {
     frame,
+    applySettings,
     resize,
     destroy: () => {
       if (resources !== null) releaseResources(resources);

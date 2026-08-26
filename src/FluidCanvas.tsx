@@ -1,25 +1,75 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { MAX_STEPS_PER_FRAME, TIME_STEP } from "@/fluid/config";
 import { GpuUnavailableError, initGpu } from "@/fluid/gpu";
 import { PointerTracker } from "@/fluid/pointer";
 import { createFluidRenderer } from "@/fluid/renderer";
 import { seedEnabled, seedSplats } from "@/fluid/seed";
+import type { FluidSettings } from "@/fluid/settings";
+import { DEFAULT_SETTINGS } from "@/fluid/settings";
+import { loadSettings, saveSettings } from "@/fluid/settingsStorage";
 import type { FluidRenderer, Splat } from "@/fluid/types";
+import { SettingsPanel } from "@/SettingsPanel";
 
 /** Cap the backing store on high-DPI displays: past 2x the extra pixels cost
  * fill rate without being visible. */
 const MAX_PIXEL_RATIO = 2;
 
+const SAVE_DEBOUNCE_MS = 200;
+
 export const FluidCanvas = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [error, setError] = useState<string | null>(null);
+  const [settings, setSettings] = useState<FluidSettings>(loadSettings);
+
+  // Held in a ref as well as state: the simulation effect must not re-run —
+  // and tear down the GPU device — every time a slider moves.
+  const rendererRef = useRef<FluidRenderer | null>(null);
+  const pointerRef = useRef<PointerTracker | null>(null);
+  const settingsRef = useRef(settings);
+
+  const saveTimerRef = useRef<number | null>(null);
+
+  const applySettings = useCallback((next: FluidSettings) => {
+    settingsRef.current = next;
+    setSettings(next);
+    rendererRef.current?.applySettings(next);
+    pointerRef.current?.setForce(next.splatForce);
+
+    // Debounced because a dragged slider fires per pointer move; only the value
+    // it rests on has to be stored, while the lines above take every one.
+    if (saveTimerRef.current !== null) {
+      window.clearTimeout(saveTimerRef.current);
+    }
+    saveTimerRef.current = window.setTimeout(() => {
+      saveTimerRef.current = null;
+      saveSettings(settingsRef.current);
+    }, SAVE_DEBOUNCE_MS);
+  }, []);
+
+  // Flushed on hide because a pending save would otherwise be lost to a tab
+  // closed mid-drag; `pagehide` is the last event a bfcache-eligible page gets.
+  useEffect(() => {
+    const flush = (): void => {
+      if (saveTimerRef.current === null) return;
+      window.clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = null;
+      saveSettings(settingsRef.current);
+    };
+    window.addEventListener("pagehide", flush);
+    return () => {
+      window.removeEventListener("pagehide", flush);
+      flush();
+    };
+  }, []);
 
   useEffect(() => {
     const canvas = canvasRef.current;
     if (canvas === null) return;
 
     const pointer = new PointerTracker();
+    pointer.setForce(settingsRef.current.splatForce);
+    pointerRef.current = pointer;
     let renderer: FluidRenderer | null = null;
     let gpuDevice: GPUDevice | null = null;
     let frameId = 0;
@@ -78,6 +128,8 @@ export const FluidCanvas = () => {
 
       const { width, height } = resizeCanvas();
       renderer = createFluidRenderer(device, context, format, width, height);
+      renderer.applySettings(settingsRef.current);
+      rendererRef.current = renderer;
 
       canvas.addEventListener("pointerdown", onPointerDown);
       canvas.addEventListener("pointermove", onPointerMove);
@@ -137,6 +189,8 @@ export const FluidCanvas = () => {
       canvas.removeEventListener("pointerup", onPointerUp);
       canvas.removeEventListener("pointercancel", onPointerUp);
       renderer?.destroy();
+      rendererRef.current = null;
+      pointerRef.current = null;
       gpuDevice?.destroy();
     };
   }, []);
@@ -149,5 +203,16 @@ export const FluidCanvas = () => {
     );
   }
 
-  return <canvas ref={canvasRef} aria-label="Fluid simulation" />;
+  return (
+    <>
+      <canvas ref={canvasRef} aria-label="Fluid simulation" />
+      <SettingsPanel
+        settings={settings}
+        onChange={applySettings}
+        onReset={() => {
+          applySettings(DEFAULT_SETTINGS);
+        }}
+      />
+    </>
+  );
 };

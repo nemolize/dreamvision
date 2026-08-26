@@ -2,7 +2,9 @@
 
 Real-time fluid simulation filling the browser viewport, solved entirely on the
 GPU with [WebGPU](https://www.w3.org/TR/webgpu/) compute shaders. It opens
-mid-motion and settles as the dye dissipates; drag anywhere to stir it.
+mid-motion and settles as the dye dissipates; drag anywhere to stir it. A panel
+behind the gear in the corner tunes the solver live — decay rates, splat size
+and force, pressure sweeps — and remembers what you set.
 
 Built with React + Vite and deployed to
 [Cloudflare Workers](https://workers.cloudflare.com/) as static assets.
@@ -87,8 +89,9 @@ the options are in
 
 - `src/fluid/` — the simulation: WGSL shaders, the WebGPU pipeline setup
   (`renderer.ts`), device acquisition (`gpu.ts`), and pointer tracking
-- `src/FluidCanvas.tsx` — the canvas host; owns the animation loop and holds no
-  React state beyond an error message
+- `src/FluidCanvas.tsx` — the canvas host; owns the animation loop, and holds
+  the settings the panel edits alongside an error message
+- `src/SettingsPanel.tsx` — the collapsible panel of solver controls
 - `e2e-tests/` — Playwright specs, including one that drags across the canvas
   and asserts pixels actually light up
 
