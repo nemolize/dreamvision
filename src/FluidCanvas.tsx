@@ -15,6 +15,8 @@ import { SettingsPanel } from "@/SettingsPanel";
  * fill rate without being visible. */
 const MAX_PIXEL_RATIO = 2;
 
+const SAVE_DEBOUNCE_MS = 200;
+
 export const FluidCanvas = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [error, setError] = useState<string | null>(null);
@@ -26,12 +28,39 @@ export const FluidCanvas = () => {
   const pointerRef = useRef<PointerTracker | null>(null);
   const settingsRef = useRef(settings);
 
+  const saveTimerRef = useRef<number | null>(null);
+
   const applySettings = useCallback((next: FluidSettings) => {
     settingsRef.current = next;
     setSettings(next);
-    saveSettings(next);
     rendererRef.current?.applySettings(next);
     pointerRef.current?.setForce(next.splatForce);
+
+    // Debounced because a dragged slider fires per pointer move; only the value
+    // it rests on has to be stored, while the lines above take every one.
+    if (saveTimerRef.current !== null) {
+      window.clearTimeout(saveTimerRef.current);
+    }
+    saveTimerRef.current = window.setTimeout(() => {
+      saveTimerRef.current = null;
+      saveSettings(settingsRef.current);
+    }, SAVE_DEBOUNCE_MS);
+  }, []);
+
+  // Flushed on hide because a pending save would otherwise be lost to a tab
+  // closed mid-drag; `pagehide` is the last event a bfcache-eligible page gets.
+  useEffect(() => {
+    const flush = (): void => {
+      if (saveTimerRef.current === null) return;
+      window.clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = null;
+      saveSettings(settingsRef.current);
+    };
+    window.addEventListener("pagehide", flush);
+    return () => {
+      window.removeEventListener("pagehide", flush);
+      flush();
+    };
   }, []);
 
   useEffect(() => {

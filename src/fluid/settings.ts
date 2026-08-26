@@ -91,7 +91,10 @@ export const clampSetting = (
   if (descriptor === undefined || !Number.isFinite(value)) {
     return DEFAULT_SETTINGS[key];
   }
-  return Math.min(descriptor.max, Math.max(descriptor.min, value));
+  const bounded = Math.min(descriptor.max, Math.max(descriptor.min, value));
+  // Integer-step settings index a loop or a count, so a consumer receiving a
+  // fractional one would have to re-guard what the descriptor already declares.
+  return Number.isInteger(descriptor.step) ? Math.round(bounded) : bounded;
 };
 
 /** Falls back per key rather than wholesale, so a blob predating a key this

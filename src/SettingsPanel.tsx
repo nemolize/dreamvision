@@ -23,7 +23,7 @@ export const SettingsPanel = ({
         type="button"
         className="settings__toggle"
         aria-expanded={open}
-        aria-controls={panelId}
+        aria-controls={open ? panelId : undefined}
         aria-label={open ? "Close settings" : "Open settings"}
         onClick={() => {
           setOpen((current) => !current);

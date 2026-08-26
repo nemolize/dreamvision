@@ -89,8 +89,9 @@ the options are in
 
 - `src/fluid/` — the simulation: WGSL shaders, the WebGPU pipeline setup
   (`renderer.ts`), device acquisition (`gpu.ts`), and pointer tracking
-- `src/FluidCanvas.tsx` — the canvas host; owns the animation loop and holds no
-  React state beyond an error message
+- `src/FluidCanvas.tsx` — the canvas host; owns the animation loop, and holds
+  the settings the panel edits alongside an error message
+- `src/SettingsPanel.tsx` — the collapsible panel of solver controls
 - `e2e-tests/` — Playwright specs, including one that drags across the canvas
   and asserts pixels actually light up
 

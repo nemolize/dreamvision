@@ -144,6 +144,28 @@ test.describe("fluid canvas", () => {
     );
   });
 
+  test("stores a setting on its own, without waiting for the page to hide", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    await page.evaluate(() => {
+      window.localStorage.clear();
+    });
+    await page.goto("/");
+    await page.getByRole("button", { name: "Open settings" }).click();
+    await page.getByRole("slider", { name: "Splat force" }).fill("64");
+
+    // Read from the live page because a reload flushes the pending write on its
+    // way out, and would pass even if the debounce never fired.
+    await expect
+      .poll(() =>
+        page.evaluate(() =>
+          window.localStorage.getItem("dreamvision.settings"),
+        ),
+      )
+      .toContain('"splatForce":64');
+  });
+
   test("carries the dye decay slider through to the solver", async ({
     page,
   }) => {

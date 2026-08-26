@@ -38,6 +38,7 @@ const SPLAT_UNIFORM = {
 const SPLAT_UNIFORM_FLOATS = 12;
 
 const ADVECT_PARAM = {
+  gridSize: 0,
   dissipation: 2,
 } as const;
 
@@ -280,6 +281,14 @@ export const createFluidRenderer = (
     return buffer;
   };
 
+  const makeAdvectParams = (grid: Grid, dissipation: number): GPUBuffer => {
+    const values = new Array<number>(PARAM_BYTES / 4).fill(0);
+    values[ADVECT_PARAM.gridSize] = grid.width;
+    values[ADVECT_PARAM.gridSize + 1] = grid.height;
+    values[ADVECT_PARAM.dissipation] = dissipation;
+    return makeParamBuffer(values);
+  };
+
   /** One bind group per face the source buffer may be on, indexed by that
    * face — the pressure solve alone would otherwise build one per sweep. */
   type FacePair = readonly [GPUBindGroup, GPUBindGroup];
@@ -330,18 +339,11 @@ export const createFluidRenderer = (
     });
     const divergenceView = divergence.createView();
 
-    const advectVelocityParams = makeParamBuffer([
-      simGrid.width,
-      simGrid.height,
+    const advectVelocityParams = makeAdvectParams(
+      simGrid,
       settings.velocityDissipation,
-      0,
-    ]);
-    const advectDyeParams = makeParamBuffer([
-      dyeGrid.width,
-      dyeGrid.height,
-      settings.dyeDissipation,
-      0,
-    ]);
+    );
+    const advectDyeParams = makeAdvectParams(dyeGrid, settings.dyeDissipation);
     const splatVelocityParams = makeParamBuffer([
       simGrid.width,
       simGrid.height,
@@ -585,8 +587,7 @@ export const createFluidRenderer = (
       simDispatch,
     );
 
-    const sweeps = Math.max(1, Math.round(settings.pressureIterations));
-    for (let i = 0; i < sweeps; i++) {
+    for (let i = 0; i < settings.pressureIterations; i++) {
       run(
         pipelines.pressure,
         current.pressurePass[pressure.readFace],

@@ -17,6 +17,16 @@ describe("clampSetting", () => {
     expect(clampSetting("splatForce", -5)).toBe(1);
   });
 
+  it("snaps a setting whose step is an integer", () => {
+    expect(clampSetting("pressureIterations", 3.7)).toBe(4);
+    expect(clampSetting("splatForce", 29.4)).toBe(29);
+  });
+
+  it("leaves a fractional-step setting unsnapped", () => {
+    expect(clampSetting("splatRadius", 0.0037)).toBeCloseTo(0.0037, 6);
+    expect(clampSetting("dyeDissipation", 0.65)).toBeCloseTo(0.65, 6);
+  });
+
   it("falls back to the default for a non-finite value", () => {
     expect(clampSetting("dyeDissipation", Number.NaN)).toBe(
       DEFAULT_SETTINGS.dyeDissipation,
@@ -39,6 +49,13 @@ describe("normaliseSettings", () => {
     const result = normaliseSettings({ splatForce: 50 });
     expect(result.splatForce).toBe(50);
     expect(result.dyeDissipation).toBe(DEFAULT_SETTINGS.dyeDissipation);
+  });
+
+  it("yields an integer sweep count, which the renderer loops on directly", () => {
+    expect(normaliseSettings({ pressureIterations: 3.7 })).toMatchObject({
+      pressureIterations: 4,
+    });
+    expect(Number.isInteger(DEFAULT_SETTINGS.pressureIterations)).toBe(true);
   });
 
   it("clamps an out-of-range stored value", () => {
