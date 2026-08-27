@@ -28,8 +28,41 @@ const SAMPLE_WIDTH = 64;
 
 /** The settings toggle sits over the canvas, and an element screenshot
  * composites it in — its lit corner otherwise counts as dye. */
-const hideSettings = async (page: Page): Promise<void> => {
-  await page.addStyleTag({ content: ".settings { display: none; }" });
+const hideSettings = async (page: Page, hidden = true): Promise<void> => {
+  await page.evaluate((on) => {
+    const id = "e2e-hide-settings";
+    document.getElementById(id)?.remove();
+    if (!on) return;
+    const style = document.createElement("style");
+    style.id = id;
+    style.textContent = ".settings { display: none; }";
+    document.head.append(style);
+  }, hidden);
+};
+
+/** Hides the panel only for the read, so a test can keep driving it afterwards. */
+const whileHidden = async <T>(
+  page: Page,
+  read: () => Promise<T>,
+): Promise<T> => {
+  await hideSettings(page);
+  try {
+    return await read();
+  } finally {
+    await hideSettings(page, false);
+  }
+};
+
+/** Blurs as well as fills, because a resolution row reports its value on
+ * release: `fill` alone leaves the panel treating the drag as still in hand. */
+const settleSlider = async (
+  page: Page,
+  name: string,
+  value: string,
+): Promise<void> => {
+  const slider = page.getByRole("slider", { name });
+  await slider.fill(value);
+  await slider.blur();
 };
 
 /** Read through a screenshot because a WebGPU canvas does not preserve its
@@ -117,7 +150,7 @@ test.describe("fluid canvas", () => {
     await page.getByRole("button", { name: "Open settings" }).click();
 
     await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
-    await expect(page.getByRole("slider")).toHaveCount(5);
+    await expect(page.getByRole("slider")).toHaveCount(7);
   });
 
   test("restores a changed setting after a reload, and drops it on reset", async ({
@@ -207,6 +240,70 @@ test.describe("fluid canvas", () => {
 
     expect(slow).toBeGreaterThan(0.5);
     expect(fast).toBeLessThan(0.2);
+  });
+
+  test("carries the dye across a resolution change instead of blanking it", async ({
+    page,
+  }) => {
+    // Raised because each canvas read is a screenshot, which costs seconds
+    // against CI's software renderer — the default 30s ceiling is not enough.
+    test.setTimeout(180_000);
+
+    await page.goto("/?seed=off");
+    await page.evaluate(() => {
+      window.localStorage.clear();
+    });
+    await page.goto("/?seed=off");
+    await expect(page.getByRole("alert")).toHaveCount(0);
+
+    await page.getByRole("button", { name: "Open settings" }).click();
+    // Held still so the reads either side of the rebuild differ by the rebuild
+    // and not by however long the screenshots took.
+    await page.getByRole("slider", { name: "Dye decay" }).fill("0");
+
+    const viewport = page.viewportSize() ?? { width: 1280, height: 720 };
+    await stir(page, viewport);
+
+    const before = await whileHidden(page, () => meanBrightness(page));
+    expect(before).toBeGreaterThan(0);
+
+    await settleSlider(page, "Sim grid", "128");
+    await settleSlider(page, "Dye grid", "512");
+    await page.evaluate(
+      () => new Promise((resolve) => requestAnimationFrame(resolve)),
+    );
+
+    // Releasing the old textures before building the new ones would read as 0
+    // here; the resample pass is the only thing that keeps the dye.
+    const after = await whileHidden(page, () => meanBrightness(page));
+    expect(after).toBeGreaterThan(before * 0.5);
+  });
+
+  test("restores a changed resolution after a reload", async ({ page }) => {
+    await page.goto("/");
+    await page.evaluate(() => {
+      window.localStorage.clear();
+    });
+    await page.goto("/");
+    await page.getByRole("button", { name: "Open settings" }).click();
+
+    const initial = await page
+      .getByRole("slider", { name: "Sim grid" })
+      .inputValue();
+    await settleSlider(page, "Sim grid", "160");
+
+    await page.reload();
+    await page.getByRole("button", { name: "Open settings" }).click();
+    await expect(page.getByRole("slider", { name: "Sim grid" })).toHaveValue(
+      "160",
+    );
+
+    await page.getByRole("button", { name: "Reset" }).click();
+    await page.reload();
+    await page.getByRole("button", { name: "Open settings" }).click();
+    await expect(page.getByRole("slider", { name: "Sim grid" })).toHaveValue(
+      initial,
+    );
   });
 
   test("starts the GPU simulation and paints dye where the pointer drags", async ({

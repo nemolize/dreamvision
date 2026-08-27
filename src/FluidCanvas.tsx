@@ -4,10 +4,17 @@ import { MAX_STEPS_PER_FRAME, TIME_STEP } from "@/fluid/config";
 import { GpuUnavailableError, initGpu } from "@/fluid/gpu";
 import { PointerTracker } from "@/fluid/pointer";
 import { createFluidRenderer } from "@/fluid/renderer";
+import type { ResolutionSettings } from "@/fluid/resolution";
+import { DEFAULT_RESOLUTION } from "@/fluid/resolution";
 import { seedEnabled, seedSplats } from "@/fluid/seed";
 import type { FluidSettings } from "@/fluid/settings";
 import { DEFAULT_SETTINGS } from "@/fluid/settings";
-import { loadSettings, saveSettings } from "@/fluid/settingsStorage";
+import {
+  loadResolution,
+  loadSettings,
+  saveResolution,
+  saveSettings,
+} from "@/fluid/settingsStorage";
 import type { FluidRenderer, Splat } from "@/fluid/types";
 import { SettingsPanel } from "@/SettingsPanel";
 
@@ -21,12 +28,15 @@ export const FluidCanvas = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [error, setError] = useState<string | null>(null);
   const [settings, setSettings] = useState<FluidSettings>(loadSettings);
+  const [resolution, setResolution] =
+    useState<ResolutionSettings>(loadResolution);
 
   // Held in a ref as well as state: the simulation effect must not re-run —
   // and tear down the GPU device — every time a slider moves.
   const rendererRef = useRef<FluidRenderer | null>(null);
   const pointerRef = useRef<PointerTracker | null>(null);
   const settingsRef = useRef(settings);
+  const resolutionRef = useRef(resolution);
 
   const saveTimerRef = useRef<number | null>(null);
 
@@ -45,6 +55,15 @@ export const FluidCanvas = () => {
       saveTimerRef.current = null;
       saveSettings(settingsRef.current);
     }, SAVE_DEBOUNCE_MS);
+  }, []);
+
+  // Undebounced, unlike the settings above: the panel only reports a resolution
+  // once the drag ends, so there is no per-move burst to collapse.
+  const applyResolution = useCallback((next: ResolutionSettings) => {
+    resolutionRef.current = next;
+    setResolution(next);
+    rendererRef.current?.setResolution(next);
+    saveResolution(next);
   }, []);
 
   // Flushed on hide because a pending save would otherwise be lost to a tab
@@ -127,7 +146,14 @@ export const FluidCanvas = () => {
       });
 
       const { width, height } = resizeCanvas();
-      renderer = createFluidRenderer(device, context, format, width, height);
+      renderer = createFluidRenderer(
+        device,
+        context,
+        format,
+        width,
+        height,
+        resolutionRef.current,
+      );
       renderer.applySettings(settingsRef.current);
       rendererRef.current = renderer;
 
@@ -208,9 +234,12 @@ export const FluidCanvas = () => {
       <canvas ref={canvasRef} aria-label="Fluid simulation" />
       <SettingsPanel
         settings={settings}
+        resolution={resolution}
         onChange={applySettings}
+        onResolutionChange={applyResolution}
         onReset={() => {
           applySettings(DEFAULT_SETTINGS);
+          applyResolution(DEFAULT_RESOLUTION);
         }}
       />
     </>
