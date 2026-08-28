@@ -5,6 +5,7 @@ import {
   DEFAULT_RESOLUTION,
   normaliseResolution,
   RESOLUTION_DESCRIPTORS,
+  sameResolution,
 } from "./resolution";
 
 describe("RESOLUTION_DESCRIPTORS", () => {
@@ -36,6 +37,29 @@ describe("clampResolution", () => {
     expect(clampResolution("simResolution", Number.NaN)).toBe(
       DEFAULT_RESOLUTION.simResolution,
     );
+  });
+});
+
+describe("sameResolution", () => {
+  it("compares by value, since every caller holds a fresh object", () => {
+    expect(sameResolution(DEFAULT_RESOLUTION, { ...DEFAULT_RESOLUTION })).toBe(
+      true,
+    );
+  });
+
+  it("separates on either axis alone", () => {
+    expect(
+      sameResolution(DEFAULT_RESOLUTION, {
+        ...DEFAULT_RESOLUTION,
+        simResolution: 128,
+      }),
+    ).toBe(false);
+    expect(
+      sameResolution(DEFAULT_RESOLUTION, {
+        ...DEFAULT_RESOLUTION,
+        dyeResolution: 512,
+      }),
+    ).toBe(false);
   });
 });
 

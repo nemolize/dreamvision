@@ -118,8 +118,10 @@ canvas {
 .notice {
   display: flex;
   height: 100%;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: 1.25rem;
   margin: 0;
   padding: 2rem;
   color: #9aa0a6;
@@ -127,4 +129,18 @@ canvas {
     1rem/1.6 system-ui,
     sans-serif;
   text-align: center;
+}
+
+.notice__action {
+  padding: 0.5rem 1rem;
+  border: 1px solid #ffffff2e;
+  border-radius: 0.375rem;
+  background: #ffffff0a;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.notice__action:hover {
+  background: #ffffff14;
 }

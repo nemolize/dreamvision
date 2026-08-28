@@ -5,7 +5,7 @@ import { GpuUnavailableError, initGpu } from "@/fluid/gpu";
 import { PointerTracker } from "@/fluid/pointer";
 import { createFluidRenderer } from "@/fluid/renderer";
 import type { ResolutionSettings } from "@/fluid/resolution";
-import { DEFAULT_RESOLUTION } from "@/fluid/resolution";
+import { DEFAULT_RESOLUTION, sameResolution } from "@/fluid/resolution";
 import { seedEnabled, seedSplats } from "@/fluid/seed";
 import type { FluidSettings } from "@/fluid/settings";
 import { DEFAULT_SETTINGS } from "@/fluid/settings";
@@ -16,6 +16,7 @@ import {
   saveSettings,
 } from "@/fluid/settingsStorage";
 import type { FluidRenderer, Splat } from "@/fluid/types";
+import { GpuNotice } from "@/GpuNotice";
 import { SettingsPanel } from "@/SettingsPanel";
 
 /** Cap the backing store on high-DPI displays: past 2x the extra pixels cost
@@ -26,7 +27,12 @@ const SAVE_DEBOUNCE_MS = 200;
 
 export const FluidCanvas = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [error, setError] = useState<string | null>(null);
+  // Two fields rather than one message, because whether the resolution is worth
+  // offering to reset is decided where the failure is caught, not where it renders.
+  const [failure, setFailure] = useState<{
+    message: string;
+    resolutionSuspect: boolean;
+  } | null>(null);
   const [settings, setSettings] = useState<FluidSettings>(loadSettings);
   const [resolution, setResolution] =
     useState<ResolutionSettings>(loadResolution);
@@ -142,7 +148,18 @@ export const FluidCanvas = () => {
       void device.lost.then((info) => {
         if (disposed || info.reason === "destroyed") return;
         cancelAnimationFrame(frameId);
-        setError("The GPU device was lost. Reload to restart the simulation.");
+        // A device lost at a raised resolution otherwise dead-ends: the value is
+        // already persisted, so every reload rebuilds at the size that lost it.
+        const suspect = !sameResolution(
+          resolutionRef.current,
+          DEFAULT_RESOLUTION,
+        );
+        setFailure({
+          message: suspect
+            ? "The GPU device was lost. The grid resolution may be more than this device can hold."
+            : "The GPU device was lost. Reload to restart the simulation.",
+          resolutionSuspect: suspect,
+        });
       });
 
       const { width, height } = resizeCanvas();
@@ -199,11 +216,17 @@ export const FluidCanvas = () => {
 
     void start().catch((cause: unknown) => {
       if (disposed) return;
-      setError(
-        cause instanceof GpuUnavailableError
+      // A raised resolution can fail the build itself, not only the running
+      // device, and lands in the same reload loop — so it gets the same escape.
+      const unavailable = cause instanceof GpuUnavailableError;
+      setFailure({
+        message: unavailable
           ? cause.message
           : "The simulation could not start on this device.",
-      );
+        resolutionSuspect:
+          !unavailable &&
+          !sameResolution(resolutionRef.current, DEFAULT_RESOLUTION),
+      });
     });
 
     return () => {
@@ -221,11 +244,17 @@ export const FluidCanvas = () => {
     };
   }, []);
 
-  if (error !== null) {
+  if (failure !== null) {
     return (
-      <p className="notice" role="alert">
-        {error}
-      </p>
+      <GpuNotice
+        message={failure.message}
+        {...(failure.resolutionSuspect && {
+          onResetResolution: () => {
+            saveResolution(DEFAULT_RESOLUTION);
+            window.location.reload();
+          },
+        })}
+      />
     );
   }
 

@@ -86,13 +86,37 @@ onto cell faces, which advection and the splat would have to follow. Numbers and
 the options are in
 [#681](https://github.com/nemolize/dreamvision/issues/681).
 
+### What the resolution sliders cost
+
+The grids are the one setting that cannot take effect on the next frame:
+changing either rebuilds every texture. The rebuild builds the new set, carries
+the live velocity and dye onto it with a resample pass, and only then releases
+the old one — so the fields survive, at the cost of both sets being alive across
+one submit. Pressure is not carried; the Jacobi sweeps rebuild it within the
+frame.
+
+At the panel's maxima (sim 512, dye 2048) the textures come to ~83 MB on a 16:9
+viewport, transiently ~166 MB during a rebuild, against ~22 MB at the defaults.
+On an M-series Mac every step from the defaults to the maxima holds the display's
+120 Hz cap with no device loss, so nothing the panel offers saturates that
+machine; under the software renderer the Playwright suite uses — which does not
+hit a vsync cap, and so is the reading that separates the steps — the maxima cost
+about 2.2x the defaults per frame.
+
+Both readings are one machine each. A memory-tight GPU may still lose the device
+at a raised setting, so the notice that reports a lost device offers to reset the
+resolution and reload — the stored value is what the next load rebuilds at, and
+without that the notice would be a dead end.
+
 ## Project layout
 
 - `src/fluid/` — the simulation: WGSL shaders, the WebGPU pipeline setup
   (`renderer.ts`), device acquisition (`gpu.ts`), and pointer tracking
 - `src/FluidCanvas.tsx` — the canvas host; owns the animation loop, and holds
-  the settings the panel edits alongside an error message
+  the settings the panel edits alongside any failure to report
 - `src/SettingsPanel.tsx` — the collapsible panel of solver controls
+- `src/GpuNotice.tsx` — what replaces the canvas when the GPU fails, including
+  the offer to reset the resolution
 - `e2e-tests/` — Playwright specs, including one that drags across the canvas
   and asserts pixels actually light up
 

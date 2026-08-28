@@ -8,6 +8,7 @@ import renderShaderSource from "./render.wgsl?raw";
 import type { ResampleField } from "./resample";
 import { createFieldResampler } from "./resample";
 import type { ResolutionSettings } from "./resolution";
+import { sameResolution } from "./resolution";
 import type { FluidSettings } from "./settings";
 import { DEFAULT_SETTINGS } from "./settings";
 import simulationShaderSource from "./simulation.wgsl?raw";
@@ -488,12 +489,7 @@ export const createFluidRenderer = (
   };
 
   const setResolution = (next: ResolutionSettings): void => {
-    if (
-      next.simResolution === resolution.simResolution &&
-      next.dyeResolution === resolution.dyeResolution
-    ) {
-      return;
-    }
+    if (sameResolution(next, resolution)) return;
     resolution = next;
     rebuild(canvasSize.width, canvasSize.height);
   };
