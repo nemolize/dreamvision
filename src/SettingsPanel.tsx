@@ -11,6 +11,7 @@ interface SliderRowProps {
   value: number;
   onChange: (value: number) => void;
   onCommit?: () => void;
+  onAbandon?: () => void;
 }
 
 const SliderRow = ({
@@ -18,6 +19,7 @@ const SliderRow = ({
   value,
   onChange,
   onCommit,
+  onAbandon,
 }: SliderRowProps) => (
   <label className="settings__row">
     <span className="settings__label">{label}</span>
@@ -33,6 +35,7 @@ const SliderRow = ({
       onPointerUp={onCommit}
       onKeyUp={onCommit}
       onBlur={onCommit}
+      onPointerCancel={onAbandon}
     />
     <output className="settings__value">{value.toFixed(precision)}</output>
   </label>
@@ -65,6 +68,12 @@ export const SettingsPanel = ({
     if (pending === null) return;
     setPending(null);
     onResolutionChange(pending);
+  };
+
+  // A cancelled drag never reaches `pointerup`, so without this the value it
+  // reached would sit pending and commit at some later unrelated blur.
+  const abandonResolution = (): void => {
+    setPending(null);
   };
 
   return (
@@ -112,6 +121,7 @@ export const SettingsPanel = ({
                 });
               }}
               onCommit={commitResolution}
+              onAbandon={abandonResolution}
             />
           ))}
 
@@ -119,7 +129,7 @@ export const SettingsPanel = ({
             type="button"
             className="settings__reset"
             onClick={() => {
-              setPending(null);
+              abandonResolution();
               onReset();
             }}
           >

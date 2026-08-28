@@ -152,6 +152,27 @@ describe("SettingsPanel", () => {
       });
     });
 
+    it("drops a cancelled drag rather than holding it for a later release", async () => {
+      const onResolutionChange = resolutionSpy();
+      renderPanel({ onResolutionChange });
+      await open();
+
+      const sim = screen.getByRole("slider", { name: "Sim grid" });
+      fireEvent.change(sim, { target: { value: "192" } });
+      fireEvent.pointerCancel(sim);
+
+      expect(onResolutionChange).not.toHaveBeenCalled();
+      expect(sim).toHaveProperty(
+        "value",
+        String(DEFAULT_RESOLUTION.simResolution),
+      );
+
+      // A cancelled value left pending would ride out on the next release, at a
+      // moment the user never chose.
+      fireEvent.pointerUp(sim);
+      expect(onResolutionChange).not.toHaveBeenCalled();
+    });
+
     it("commits a keyboard adjustment on key release", async () => {
       const onResolutionChange = resolutionSpy();
       renderPanel({ onResolutionChange });

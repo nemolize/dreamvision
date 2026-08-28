@@ -8,8 +8,8 @@ import {
 import type { SettingDescriptor } from "./descriptor";
 import { describeSettings } from "./descriptor";
 
-/** Only constants that take effect on the next frame: anything that resizes a
- * grid or rebuilds a pipeline would make the panel a restart, not a control. */
+/** Only constants that take effect on the next frame. Grid sizes cannot, so
+ * they travel on their own channel — see `ResolutionSettings`. */
 export interface FluidSettings {
   velocityDissipation: number;
   dyeDissipation: number;

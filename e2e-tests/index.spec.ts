@@ -40,7 +40,6 @@ const hideSettings = async (page: Page, hidden = true): Promise<void> => {
   }, hidden);
 };
 
-/** Hides the panel only for the read, so a test can keep driving it afterwards. */
 const whileHidden = async <T>(
   page: Page,
   read: () => Promise<T>,
@@ -242,7 +241,7 @@ test.describe("fluid canvas", () => {
     expect(fast).toBeLessThan(0.2);
   });
 
-  test("carries the dye across a resolution change instead of blanking it", async ({
+  test("carries both fields across a resolution change instead of blanking them", async ({
     page,
   }) => {
     // Raised because each canvas read is a screenshot, which costs seconds
@@ -277,6 +276,15 @@ test.describe("fluid canvas", () => {
     // here; the resample pass is the only thing that keeps the dye.
     const after = await whileHidden(page, () => meanBrightness(page));
     expect(after).toBeGreaterThan(before * 0.5);
+
+    // Brightness cannot see the velocity half of the carry — dropping it freezes
+    // the fluid with every lit pixel in place; only motion shows it survived.
+    const changed = await whileHidden(page, async () => {
+      const first = await sampleCanvas(page);
+      const second = await sampleCanvas(page);
+      return meanChange(first, second);
+    });
+    expect(changed).toBeGreaterThan(0.002);
   });
 
   test("restores a changed resolution after a reload", async ({ page }) => {
