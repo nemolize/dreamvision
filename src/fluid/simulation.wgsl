@@ -169,6 +169,31 @@ fn gradientSubtract(@builtin(global_invocation_id) gid: vec3u) {
   textureStore(gradientOutput, gid.xy, vec4f(bounded, 0.0, 1.0));
 }
 
+// ------------------------------------------------------------------ resample
+
+struct ResampleParams {
+  sourceSize: vec2f,
+  targetSize: vec2f,
+}
+
+@group(1) @binding(0) var resampleSource: texture_2d<f32>;
+@group(1) @binding(1) var resampleOutput: texture_storage_2d<rgba32float, write>;
+@group(1) @binding(2) var<uniform> resampleParams: ResampleParams;
+
+/// Carry a field onto a grid of a different size. Both grids cover the same
+/// region, so the target cell's centre maps onto the source's cell space and
+/// `sampleAt` gathers what was there.
+@compute @workgroup_size(WORKGROUP_SIZE, WORKGROUP_SIZE)
+fn resample(@builtin(global_invocation_id) gid: vec3u) {
+  let size = vec2u(resampleParams.targetSize);
+  if (gid.x >= size.x || gid.y >= size.y) { return; }
+
+  let cell = (vec2f(gid.xy) + 0.5) / resampleParams.targetSize
+    * resampleParams.sourceSize - 0.5;
+  let carried = sampleAt(resampleSource, resampleParams.sourceSize, cell);
+  textureStore(resampleOutput, gid.xy, carried);
+}
+
 // --------------------------------------------------------------------- splat
 
 struct SplatParams {

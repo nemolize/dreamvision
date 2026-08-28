@@ -4,7 +4,8 @@ Real-time fluid simulation filling the browser viewport, solved entirely on the
 GPU with [WebGPU](https://www.w3.org/TR/webgpu/) compute shaders. It opens
 mid-motion and settles as the dye dissipates; drag anywhere to stir it. A panel
 behind the gear in the corner tunes the solver live — decay rates, splat size
-and force, pressure sweeps — and remembers what you set.
+and force, pressure sweeps, and the grid resolutions — and remembers what you
+set.
 
 Built with React + Vite and deployed to
 [Cloudflare Workers](https://workers.cloudflare.com/) as static assets.

@@ -1,13 +1,13 @@
-import {
-  DYE_RESOLUTION,
-  MAX_SPLATS_PER_FRAME,
-  SIM_RESOLUTION,
-  TIME_STEP,
-  WORKGROUP_SIZE,
-} from "./config";
+import { MAX_SPLATS_PER_FRAME, TIME_STEP, WORKGROUP_SIZE } from "./config";
+import { DoubleBuffer } from "./doubleBuffer";
+import type { Grid } from "./grid";
+import { dispatchSize, fitGrid } from "./grid";
 import type { ProjectionScale } from "./projection";
 import { projectionScale, projectionUniform } from "./projection";
 import renderShaderSource from "./render.wgsl?raw";
+import type { ResampleField } from "./resample";
+import { createFieldResampler } from "./resample";
+import type { ResolutionSettings } from "./resolution";
 import type { FluidSettings } from "./settings";
 import { DEFAULT_SETTINGS } from "./settings";
 import simulationShaderSource from "./simulation.wgsl?raw";
@@ -53,71 +53,13 @@ const PRESSURE_FORMAT: GPUTextureFormat = "r32float";
 const STORAGE_USAGE =
   GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING;
 
-interface Grid {
-  width: number;
-  height: number;
-}
-
-/** A pair of same-format textures written alternately: a compute pass may not
- * read and write one texture, so each step reads `read` and writes `write`,
- * then the two are swapped. */
-class DoubleBuffer {
-  readonly views: readonly [GPUTextureView, GPUTextureView];
-  private readonly textures: readonly [GPUTexture, GPUTexture];
-  /** Which of the two faces currently holds the live field. */
-  private face: 0 | 1 = 0;
-
-  constructor(device: GPUDevice, grid: Grid, format: GPUTextureFormat) {
-    const create = (): GPUTexture =>
-      device.createTexture({
-        size: [grid.width, grid.height],
-        format,
-        usage: STORAGE_USAGE,
-      });
-    const first = create();
-    const second = create();
-    this.textures = [first, second];
-    this.views = [first.createView(), second.createView()];
-  }
-
-  get readFace(): 0 | 1 {
-    return this.face;
-  }
-
-  swap(): void {
-    this.face = this.face === 0 ? 1 : 0;
-  }
-
-  destroy(): void {
-    for (const texture of this.textures) texture.destroy();
-  }
-}
-
-/** Fit a grid of `resolution` cells on its longer axis to the canvas' aspect,
- * so cells stay square and the fluid is not stretched. */
-const fitGrid = (width: number, height: number, resolution: number): Grid => {
-  const aspect = width / height;
-  const cells =
-    aspect >= 1
-      ? { width: resolution, height: resolution / aspect }
-      : { width: resolution * aspect, height: resolution };
-  return {
-    width: Math.max(2, Math.round(cells.width)),
-    height: Math.max(2, Math.round(cells.height)),
-  };
-};
-
-const dispatchSize = (grid: Grid): [number, number] => [
-  Math.ceil(grid.width / WORKGROUP_SIZE),
-  Math.ceil(grid.height / WORKGROUP_SIZE),
-];
-
 export const createFluidRenderer = (
   device: GPUDevice,
   context: GPUCanvasContext,
   canvasFormat: GPUTextureFormat,
   width: number,
   height: number,
+  initialResolution: ResolutionSettings,
 ): FluidRenderer => {
   // Substituted rather than duplicated: the host's dispatch count and the
   // shader's workgroup size must agree, and a drift under-simulates in silence.
@@ -317,15 +259,31 @@ export const createFluidRenderer = (
     display: FacePair;
   }
 
+  const resampler = createFieldResampler(
+    device,
+    simulationModule,
+    sharedLayout,
+  );
+
   let resources: Resources | null = null;
   let settings: FluidSettings = DEFAULT_SETTINGS;
+  let resolution: ResolutionSettings = initialResolution;
+  let canvasSize = { width, height };
 
   const buildResources = (
     canvasWidth: number,
     canvasHeight: number,
   ): Resources => {
-    const simGrid = fitGrid(canvasWidth, canvasHeight, SIM_RESOLUTION);
-    const dyeGrid = fitGrid(canvasWidth, canvasHeight, DYE_RESOLUTION);
+    const simGrid = fitGrid(
+      canvasWidth,
+      canvasHeight,
+      resolution.simResolution,
+    );
+    const dyeGrid = fitGrid(
+      canvasWidth,
+      canvasHeight,
+      resolution.dyeResolution,
+    );
     const scale = projectionScale(simGrid.width, simGrid.height);
 
     const velocity = new DoubleBuffer(device, simGrid, VELOCITY_FORMAT);
@@ -486,9 +444,58 @@ export const createFluidRenderer = (
     for (const buffer of current.ownedParamBuffers) buffer.destroy();
   };
 
+  const liveFace = (buffer: DoubleBuffer, grid: Grid): ResampleField => ({
+    view: buffer.views[buffer.readFace],
+    width: grid.width,
+    height: grid.height,
+  });
+
+  /** Pressure is left behind rather than carried: the Jacobi sweeps rebuild it
+   * from the divergence within the frame, so resampling it buys nothing. */
+  const carryFields = (previous: Resources, next: Resources): void => {
+    const encoder = device.createCommandEncoder({ label: "fluid-rebuild" });
+    const pass = encoder.beginComputePass();
+    pass.setBindGroup(0, sharedBindGroup);
+    resampler.encodeInto(pass, [
+      {
+        source: liveFace(previous.velocity, previous.simGrid),
+        target: liveFace(next.velocity, next.simGrid),
+      },
+      {
+        source: liveFace(previous.dye, previous.dyeGrid),
+        target: liveFace(next.dye, next.dyeGrid),
+      },
+    ]);
+    pass.end();
+    device.queue.submit([encoder.finish()]);
+  };
+
+  /** Builds before releasing so the old fields can be resampled onto the new
+   * grids; the two sets overlap for one submit, doubling texture memory. */
+  const rebuild = (canvasWidth: number, canvasHeight: number): void => {
+    const previous = resources;
+    const next = buildResources(canvasWidth, canvasHeight);
+    if (previous !== null) {
+      carryFields(previous, next);
+      releaseResources(previous);
+    }
+    resources = next;
+  };
+
   const resize = (canvasWidth: number, canvasHeight: number): void => {
-    if (resources !== null) releaseResources(resources);
-    resources = buildResources(canvasWidth, canvasHeight);
+    canvasSize = { width: canvasWidth, height: canvasHeight };
+    rebuild(canvasWidth, canvasHeight);
+  };
+
+  const setResolution = (next: ResolutionSettings): void => {
+    if (
+      next.simResolution === resolution.simResolution &&
+      next.dyeResolution === resolution.dyeResolution
+    ) {
+      return;
+    }
+    resolution = next;
+    rebuild(canvasSize.width, canvasSize.height);
   };
 
   const writeDissipation = (buffer: GPUBuffer, rate: number): void => {
@@ -633,10 +640,12 @@ export const createFluidRenderer = (
   return {
     frame,
     applySettings,
+    setResolution,
     resize,
     destroy: () => {
       if (resources !== null) releaseResources(resources);
       resources = null;
+      resampler.destroy();
       uniformBuffer.destroy();
       splatBuffer.destroy();
     },
