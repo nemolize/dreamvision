@@ -287,6 +287,45 @@ test.describe("fluid canvas", () => {
     expect(changed).toBeGreaterThan(0.002);
   });
 
+  test("keeps simulating at the highest resolution the panel offers", async ({
+    page,
+  }) => {
+    // Raised because each canvas read is a screenshot, which costs seconds
+    // against CI's software renderer — the default 30s ceiling is not enough.
+    test.setTimeout(180_000);
+
+    await page.goto("/?seed=off");
+    await page.evaluate(() => {
+      window.localStorage.clear();
+    });
+    await page.goto("/?seed=off");
+    await expect(page.getByRole("alert")).toHaveCount(0);
+
+    await page.getByRole("button", { name: "Open settings" }).click();
+    const sim = page.getByRole("slider", { name: "Sim grid" });
+    const dye = page.getByRole("slider", { name: "Dye grid" });
+    await settleSlider(
+      page,
+      "Sim grid",
+      (await sim.getAttribute("max")) ?? "512",
+    );
+    await settleSlider(
+      page,
+      "Dye grid",
+      (await dye.getAttribute("max")) ?? "2048",
+    );
+
+    const viewport = page.viewportSize() ?? { width: 1280, height: 720 };
+    await stir(page, viewport);
+
+    // The maxima are the one pair of values nothing else exercises, and the
+    // device that cannot hold them fails here rather than in someone's browser.
+    await expect(page.getByRole("alert")).toHaveCount(0);
+    await expect
+      .poll(() => litFraction(page), { timeout: 60_000 })
+      .toBeGreaterThan(0.01);
+  });
+
   test("restores a changed resolution after a reload", async ({ page }) => {
     await page.goto("/");
     await page.evaluate(() => {

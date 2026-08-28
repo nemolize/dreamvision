@@ -37,6 +37,12 @@ export const RESOLUTION_DESCRIPTORS: readonly SettingDescriptor<
   },
 ];
 
+export const sameResolution = (
+  a: ResolutionSettings,
+  b: ResolutionSettings,
+): boolean =>
+  a.simResolution === b.simResolution && a.dyeResolution === b.dyeResolution;
+
 const resolution = describeSettings(RESOLUTION_DESCRIPTORS, DEFAULT_RESOLUTION);
 
 export const clampResolution = resolution.clamp;
