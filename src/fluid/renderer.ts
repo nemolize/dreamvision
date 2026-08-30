@@ -1,7 +1,7 @@
 import { MAX_SPLATS_PER_FRAME, TIME_STEP, WORKGROUP_SIZE } from "./config";
 import { DoubleBuffer } from "./doubleBuffer";
 import type { Grid } from "./grid";
-import { dispatchSize, fitGrid } from "./grid";
+import { dispatchSize, fitGrid, sameGrid } from "./grid";
 import type { ProjectionScale } from "./projection";
 import { projectionScale, projectionUniform } from "./projection";
 import renderShaderSource from "./render.wgsl?raw";
@@ -271,20 +271,19 @@ export const createFluidRenderer = (
   let resolution: ResolutionSettings = initialResolution;
   let canvasSize = { width, height };
 
+  const fitGrids = (
+    canvasWidth: number,
+    canvasHeight: number,
+  ): { simGrid: Grid; dyeGrid: Grid } => ({
+    simGrid: fitGrid(canvasWidth, canvasHeight, resolution.simResolution),
+    dyeGrid: fitGrid(canvasWidth, canvasHeight, resolution.dyeResolution),
+  });
+
   const buildResources = (
     canvasWidth: number,
     canvasHeight: number,
   ): Resources => {
-    const simGrid = fitGrid(
-      canvasWidth,
-      canvasHeight,
-      resolution.simResolution,
-    );
-    const dyeGrid = fitGrid(
-      canvasWidth,
-      canvasHeight,
-      resolution.dyeResolution,
-    );
+    const { simGrid, dyeGrid } = fitGrids(canvasWidth, canvasHeight);
     const scale = projectionScale(simGrid.width, simGrid.height);
 
     const velocity = new DoubleBuffer(device, simGrid, VELOCITY_FORMAT);
@@ -483,8 +482,20 @@ export const createFluidRenderer = (
     resources = next;
   };
 
+  /** `fitGrid` quantises, so most of a window drag's observed sizes land on the
+   * grids already built — without this the rebuild above runs every frame. */
   const resize = (canvasWidth: number, canvasHeight: number): void => {
     canvasSize = { width: canvasWidth, height: canvasHeight };
+    const current = resources;
+    if (current !== null) {
+      const next = fitGrids(canvasWidth, canvasHeight);
+      if (
+        sameGrid(next.simGrid, current.simGrid) &&
+        sameGrid(next.dyeGrid, current.dyeGrid)
+      ) {
+        return;
+      }
+    }
     rebuild(canvasWidth, canvasHeight);
   };
 

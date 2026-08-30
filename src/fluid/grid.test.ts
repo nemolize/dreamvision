@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { WORKGROUP_SIZE } from "./config";
-import { dispatchSize, fitGrid } from "./grid";
+import { SIM_RESOLUTION, WORKGROUP_SIZE } from "./config";
+import { dispatchSize, fitGrid, sameGrid } from "./grid";
 import { RESOLUTION_DESCRIPTORS } from "./resolution";
 
 /** The extremes of a viewport, so a resolution the panel offers is checked
@@ -55,6 +55,34 @@ describe("fitGrid", () => {
         }
       }
     }
+  });
+});
+
+describe("sameGrid", () => {
+  it("compares the dimensions, not the identity", () => {
+    expect(
+      sameGrid({ width: 320, height: 180 }, { width: 320, height: 180 }),
+    ).toBe(true);
+    expect(
+      sameGrid({ width: 320, height: 180 }, { width: 320, height: 181 }),
+    ).toBe(false);
+    expect(
+      sameGrid({ width: 320, height: 180 }, { width: 321, height: 180 }),
+    ).toBe(false);
+  });
+
+  it("reports most 1px canvas steps as the same grid, which is what makes the resize guard worth having", () => {
+    let unchanged = 0;
+    let total = 0;
+    for (const { width, height } of VIEWPORTS) {
+      for (let step = 0; step < 40; step++) {
+        const settled = fitGrid(width + step, height, SIM_RESOLUTION);
+        const nudged = fitGrid(width + step + 1, height, SIM_RESOLUTION);
+        if (sameGrid(settled, nudged)) unchanged++;
+        total++;
+      }
+    }
+    expect(unchanged / total).toBeGreaterThan(0.5);
   });
 });
 

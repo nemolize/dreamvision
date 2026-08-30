@@ -23,6 +23,9 @@ export const fitGrid = (
   };
 };
 
+export const sameGrid = (a: Grid, b: Grid): boolean =>
+  a.width === b.width && a.height === b.height;
+
 export const dispatchSize = (grid: Grid): [number, number] => [
   Math.ceil(grid.width / WORKGROUP_SIZE),
   Math.ceil(grid.height / WORKGROUP_SIZE),
