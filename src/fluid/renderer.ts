@@ -1,7 +1,7 @@
 import { MAX_SPLATS_PER_FRAME, TIME_STEP, WORKGROUP_SIZE } from "./config";
 import { DoubleBuffer } from "./doubleBuffer";
-import type { Grid } from "./grid";
-import { dispatchSize, fitGrid, sameGrid } from "./grid";
+import type { Grid, GridPair } from "./grid";
+import { dispatchSize, fitGrid, needsRebuild } from "./grid";
 import type { ProjectionScale } from "./projection";
 import { projectionScale, projectionUniform } from "./projection";
 import renderShaderSource from "./render.wgsl?raw";
@@ -239,7 +239,7 @@ export const createFluidRenderer = (
   interface Resources {
     simGrid: Grid;
     dyeGrid: Grid;
-    /** Fixed by the grid and the canvas, so resolved once per resize. */
+    /** Fixed by `simGrid`, so it is resolved once per rebuild. */
     scale: ProjectionScale;
     velocity: DoubleBuffer;
     dye: DoubleBuffer;
@@ -271,10 +271,7 @@ export const createFluidRenderer = (
   let resolution: ResolutionSettings = initialResolution;
   let canvasSize = { width, height };
 
-  const fitGrids = (
-    canvasWidth: number,
-    canvasHeight: number,
-  ): { simGrid: Grid; dyeGrid: Grid } => ({
+  const fitGrids = (canvasWidth: number, canvasHeight: number): GridPair => ({
     simGrid: fitGrid(canvasWidth, canvasHeight, resolution.simResolution),
     dyeGrid: fitGrid(canvasWidth, canvasHeight, resolution.dyeResolution),
   });
@@ -482,19 +479,16 @@ export const createFluidRenderer = (
     resources = next;
   };
 
-  /** `fitGrid` quantises, so most of a window drag's observed sizes land on the
-   * grids already built — without this the rebuild above runs every frame. */
+  /** Thins a drag's rebuild storm rather than stopping it: the finer dye grid
+   * decides, and at a square aspect it steps every pixel, so this never fires. */
   const resize = (canvasWidth: number, canvasHeight: number): void => {
     canvasSize = { width: canvasWidth, height: canvasHeight };
     const current = resources;
-    if (current !== null) {
-      const next = fitGrids(canvasWidth, canvasHeight);
-      if (
-        sameGrid(next.simGrid, current.simGrid) &&
-        sameGrid(next.dyeGrid, current.dyeGrid)
-      ) {
-        return;
-      }
+    if (
+      current !== null &&
+      !needsRebuild(current, fitGrids(canvasWidth, canvasHeight))
+    ) {
+      return;
     }
     rebuild(canvasWidth, canvasHeight);
   };

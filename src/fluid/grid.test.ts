@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 
-import { SIM_RESOLUTION, WORKGROUP_SIZE } from "./config";
-import { dispatchSize, fitGrid, sameGrid } from "./grid";
+import { DYE_RESOLUTION, SIM_RESOLUTION, WORKGROUP_SIZE } from "./config";
+import type { Grid } from "./grid";
+import { dispatchSize, fitGrid, needsRebuild, sameGrid } from "./grid";
 import { RESOLUTION_DESCRIPTORS } from "./resolution";
 
 /** The extremes of a viewport, so a resolution the panel offers is checked
@@ -71,18 +72,72 @@ describe("sameGrid", () => {
     ).toBe(false);
   });
 
-  it("reports most 1px canvas steps as the same grid, which is what makes the resize guard worth having", () => {
-    let unchanged = 0;
-    let total = 0;
-    for (const { width, height } of VIEWPORTS) {
-      for (let step = 0; step < 40; step++) {
-        const settled = fitGrid(width + step, height, SIM_RESOLUTION);
-        const nudged = fitGrid(width + step + 1, height, SIM_RESOLUTION);
-        if (sameGrid(settled, nudged)) unchanged++;
-        total++;
+  it("is decided by the finer dye grid, so the sim grid alone overstates how often a resize can be skipped", () => {
+    // The renderer skips only when BOTH grids match, so the sim rate alone
+    // certifies a skip rate the guard never delivers.
+    const rate = (
+      steady: (width: number, height: number) => boolean,
+    ): number => {
+      let unchanged = 0;
+      let total = 0;
+      for (const { width, height } of VIEWPORTS) {
+        for (let step = 0; step < 40; step++) {
+          if (steady(width + step, height)) unchanged++;
+          total++;
+        }
       }
+      return unchanged / total;
+    };
+
+    const steadyAt =
+      (resolution: number) =>
+      (width: number, height: number): boolean =>
+        sameGrid(
+          fitGrid(width, height, resolution),
+          fitGrid(width + 1, height, resolution),
+        );
+
+    const simOnly = rate(steadyAt(SIM_RESOLUTION));
+    const bothGrids = rate(
+      (width, height) =>
+        steadyAt(SIM_RESOLUTION)(width, height) &&
+        steadyAt(DYE_RESOLUTION)(width, height),
+    );
+
+    expect(simOnly).toBeGreaterThan(0.8);
+    expect(bothGrids).toBeLessThan(simOnly);
+    expect(bothGrids).toBeGreaterThan(0.4);
+  });
+
+  it("never skips on a square viewport, where the dye grid steps on every pixel", () => {
+    for (let step = 0; step < 8; step++) {
+      const width = 1000 + step;
+      expect(
+        sameGrid(
+          fitGrid(width, 1000, DYE_RESOLUTION),
+          fitGrid(width + 1, 1000, DYE_RESOLUTION),
+        ),
+      ).toBe(false);
     }
-    expect(unchanged / total).toBeGreaterThan(0.5);
+  });
+});
+
+describe("needsRebuild", () => {
+  const pair = (sim: Grid, dye: Grid) => ({ simGrid: sim, dyeGrid: dye });
+  const SIM = { width: 320, height: 180 };
+  const DYE = { width: 1024, height: 576 };
+
+  it("skips the rebuild only when both grids match", () => {
+    expect(needsRebuild(pair(SIM, DYE), pair(SIM, DYE))).toBe(false);
+  });
+
+  it("rebuilds when either grid alone differs, since each sizes its own textures", () => {
+    expect(
+      needsRebuild(pair(SIM, DYE), pair({ width: 320, height: 179 }, DYE)),
+    ).toBe(true);
+    expect(
+      needsRebuild(pair(SIM, DYE), pair(SIM, { width: 1024, height: 575 })),
+    ).toBe(true);
   });
 });
 
