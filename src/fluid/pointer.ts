@@ -8,8 +8,6 @@ interface Stroke {
   dx: number;
   dy: number;
   active: boolean;
-  /** Motion arrived since the last `consume`, so it is still unsplatted even
-   * if the pointer has been released since. */
   pending: boolean;
   color: readonly [number, number, number];
 }
@@ -62,8 +60,6 @@ export class PointerTracker {
 
     for (const [id, stroke] of this.strokes) {
       if (!stroke.active && !stroke.pending) {
-        // Nothing more will ever come from this id, and an ended stroke left in
-        // the map would leak one entry per touch.
         this.strokes.delete(id);
         continue;
       }

@@ -31,9 +31,8 @@ export const SPLAT_RADIUS = 0.0035;
 /** Scales normalised pointer motion into the velocity written to the field. */
 export const SPLAT_FORCE = 30;
 
-/** Ceiling on splats injected in one frame. The seed burst is the only thing
- * that approaches it; the cap bounds the uniform buffer the splat pass indexes
- * into, so anything beyond it is dropped rather than read out of range. */
+/** Bounds the uniform buffer the splat pass indexes into, so anything beyond
+ * it is dropped rather than read out of range. */
 export const MAX_SPLATS_PER_FRAME = 32;
 
 /** Splats injected once at startup, so the canvas opens mid-motion instead of

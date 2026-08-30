@@ -4,8 +4,6 @@ import { SPLAT_FORCE } from "./config";
 import { PointerTracker } from "./pointer";
 import type { Splat } from "./types";
 
-/** Narrow away the "nothing to splat" case, so a test asserting on a splat's
- * contents fails loudly rather than on a property of `undefined`. */
 const only = (splats: readonly Splat[]): Splat => {
   const [first] = splats;
   if (splats.length !== 1 || first === undefined) {
