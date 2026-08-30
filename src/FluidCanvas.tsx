@@ -110,15 +110,15 @@ export const FluidCanvas = () => {
 
     const onPointerDown = (event: PointerEvent): void => {
       const [x, y] = toNormalised(event);
-      pointer.press(x, y);
+      pointer.press(event.pointerId, x, y);
       canvas.setPointerCapture(event.pointerId);
     };
     const onPointerMove = (event: PointerEvent): void => {
       const [x, y] = toNormalised(event);
-      pointer.move(x, y);
+      pointer.move(event.pointerId, x, y);
     };
-    const onPointerUp = (): void => {
-      pointer.release();
+    const onPointerUp = (event: PointerEvent): void => {
+      pointer.release(event.pointerId);
     };
 
     const resizeCanvas = (): { width: number; height: number } => {
@@ -198,8 +198,7 @@ export const FluidCanvas = () => {
         );
         owed -= steps * TIME_STEP;
 
-        const dragged = pointer.consume();
-        if (dragged !== null) pending.push(dragged);
+        pending.push(...pointer.consume());
 
         for (let step = 0; step < steps; step++) {
           // Drained into the first step that runs: replaying the frame's splats
