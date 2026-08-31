@@ -2,6 +2,11 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { MAX_STEPS_PER_FRAME, TIME_STEP } from "@/fluid/config";
 import { GpuUnavailableError, initGpu } from "@/fluid/gpu";
+import {
+  creditedElapsed,
+  MotionGate,
+  reducedMotionQuery,
+} from "@/fluid/motion";
 import { PointerTracker } from "@/fluid/pointer";
 import { createFluidRenderer } from "@/fluid/renderer";
 import type { ResolutionSettings } from "@/fluid/resolution";
@@ -95,6 +100,11 @@ export const FluidCanvas = () => {
     const pointer = new PointerTracker();
     pointer.setForce(settingsRef.current.splatForce);
     pointerRef.current = pointer;
+    const motionQuery = reducedMotionQuery(window);
+    const motion = new MotionGate(
+      motionQuery?.matches ?? false,
+      document.hidden,
+    );
     let renderer: FluidRenderer | null = null;
     let gpuDevice: GPUDevice | null = null;
     let frameId = 0;
@@ -110,6 +120,7 @@ export const FluidCanvas = () => {
 
     const onPointerDown = (event: PointerEvent): void => {
       const [x, y] = toNormalised(event);
+      motion.requestMotion();
       pointer.press(event.pointerId, x, y);
       canvas.setPointerCapture(event.pointerId);
     };
@@ -127,6 +138,22 @@ export const FluidCanvas = () => {
     // would strand the stroke active, splatting its last position every frame.
     const onLostPointerCapture = (event: PointerEvent): void => {
       pointer.release(event.pointerId);
+    };
+
+    const onVisibilityChange = (): void => {
+      motion.setHidden(document.hidden);
+    };
+
+    const onMotionPreferenceChange = (): void => {
+      motion.setReducedMotion(motionQuery?.matches ?? false);
+    };
+
+    // Keyboard and assistive-technology users never fire pointerdown, so without
+    // this the reduced-motion hold would leave them a permanently blank canvas.
+    const onKeyDown = (event: KeyboardEvent): void => {
+      if (event.key !== "Enter" && event.key !== " ") return;
+      event.preventDefault();
+      motion.requestMotion();
     };
 
     const resizeCanvas = (): { width: number; height: number } => {
@@ -187,19 +214,31 @@ export const FluidCanvas = () => {
       canvas.addEventListener("pointerup", onPointerUp);
       canvas.addEventListener("pointercancel", onPointerUp);
       canvas.addEventListener("lostpointercapture", onLostPointerCapture);
+      canvas.addEventListener("keydown", onKeyDown);
+      document.addEventListener("visibilitychange", onVisibilityChange);
+      motionQuery?.addEventListener?.("change", onMotionPreferenceChange);
       observer.observe(canvas);
 
       let previous = performance.now();
       let owed = 0;
       // Held until the first step runs: the loop may render before enough time
       // has accumulated for a step, and the burst has to land inside one.
-      let pending: Splat[] = seedEnabled(window.location.search)
-        ? seedSplats(Math.random)
-        : [];
+      let pending: Splat[] =
+        motion.seeds && seedEnabled(window.location.search)
+          ? seedSplats(Math.random)
+          : [];
 
       const loop = (now: number): void => {
-        owed += (now - previous) / 1000;
+        const elapsed = (now - previous) / 1000;
         previous = now;
+
+        if (!motion.open) {
+          owed = 0;
+          frameId = requestAnimationFrame(loop);
+          return;
+        }
+
+        owed += creditedElapsed(elapsed);
 
         const steps = Math.min(
           Math.floor(owed / TIME_STEP),
@@ -246,6 +285,9 @@ export const FluidCanvas = () => {
       canvas.removeEventListener("pointerup", onPointerUp);
       canvas.removeEventListener("pointercancel", onPointerUp);
       canvas.removeEventListener("lostpointercapture", onLostPointerCapture);
+      canvas.removeEventListener("keydown", onKeyDown);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+      motionQuery?.removeEventListener?.("change", onMotionPreferenceChange);
       renderer?.destroy();
       rendererRef.current = null;
       pointerRef.current = null;
@@ -269,7 +311,7 @@ export const FluidCanvas = () => {
 
   return (
     <>
-      <canvas ref={canvasRef} aria-label="Fluid simulation" />
+      <canvas ref={canvasRef} aria-label="Fluid simulation" tabIndex={0} />
       <SettingsPanel
         settings={settings}
         resolution={resolution}
