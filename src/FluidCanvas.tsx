@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { MAX_STEPS_PER_FRAME, TIME_STEP } from "@/fluid/config";
 import { GpuUnavailableError, initGpu } from "@/fluid/gpu";
+import { MotionGate, prefersReducedMotion } from "@/fluid/motion";
 import { PointerTracker } from "@/fluid/pointer";
 import { createFluidRenderer } from "@/fluid/renderer";
 import type { ResolutionSettings } from "@/fluid/resolution";
@@ -95,6 +96,10 @@ export const FluidCanvas = () => {
     const pointer = new PointerTracker();
     pointer.setForce(settingsRef.current.splatForce);
     pointerRef.current = pointer;
+    const motion = new MotionGate(
+      prefersReducedMotion(window),
+      document.hidden,
+    );
     let renderer: FluidRenderer | null = null;
     let gpuDevice: GPUDevice | null = null;
     let frameId = 0;
@@ -110,6 +115,7 @@ export const FluidCanvas = () => {
 
     const onPointerDown = (event: PointerEvent): void => {
       const [x, y] = toNormalised(event);
+      motion.requestMotion();
       pointer.press(event.pointerId, x, y);
       canvas.setPointerCapture(event.pointerId);
     };
@@ -127,6 +133,10 @@ export const FluidCanvas = () => {
     // would strand the stroke active, splatting its last position every frame.
     const onLostPointerCapture = (event: PointerEvent): void => {
       pointer.release(event.pointerId);
+    };
+
+    const onVisibilityChange = (): void => {
+      motion.setHidden(document.hidden);
     };
 
     const resizeCanvas = (): { width: number; height: number } => {
@@ -187,19 +197,31 @@ export const FluidCanvas = () => {
       canvas.addEventListener("pointerup", onPointerUp);
       canvas.addEventListener("pointercancel", onPointerUp);
       canvas.addEventListener("lostpointercapture", onLostPointerCapture);
+      document.addEventListener("visibilitychange", onVisibilityChange);
       observer.observe(canvas);
 
       let previous = performance.now();
       let owed = 0;
       // Held until the first step runs: the loop may render before enough time
       // has accumulated for a step, and the burst has to land inside one.
-      let pending: Splat[] = seedEnabled(window.location.search)
-        ? seedSplats(Math.random)
-        : [];
+      let pending: Splat[] =
+        motion.seeds && seedEnabled(window.location.search)
+          ? seedSplats(Math.random)
+          : [];
 
       const loop = (now: number): void => {
-        owed += (now - previous) / 1000;
+        const elapsed = (now - previous) / 1000;
         previous = now;
+
+        if (!motion.open) {
+          // Dropped rather than banked, so reopening resumes from the present
+          // instead of fast-forwarding through however long the gate was shut.
+          owed = 0;
+          frameId = requestAnimationFrame(loop);
+          return;
+        }
+
+        owed += elapsed;
 
         const steps = Math.min(
           Math.floor(owed / TIME_STEP),
@@ -246,6 +268,7 @@ export const FluidCanvas = () => {
       canvas.removeEventListener("pointerup", onPointerUp);
       canvas.removeEventListener("pointercancel", onPointerUp);
       canvas.removeEventListener("lostpointercapture", onLostPointerCapture);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
       renderer?.destroy();
       rendererRef.current = null;
       pointerRef.current = null;
