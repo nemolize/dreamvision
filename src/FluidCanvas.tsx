@@ -119,6 +119,14 @@ export const FluidCanvas = () => {
     };
     const onPointerUp = (event: PointerEvent): void => {
       pointer.release(event.pointerId);
+      if (canvas.hasPointerCapture(event.pointerId)) {
+        canvas.releasePointerCapture(event.pointerId);
+      }
+    };
+    // Needed because a browser-revoked capture delivers no pointerup, which
+    // would strand the stroke active, splatting its last position every frame.
+    const onLostPointerCapture = (event: PointerEvent): void => {
+      pointer.release(event.pointerId);
     };
 
     const resizeCanvas = (): { width: number; height: number } => {
@@ -178,6 +186,7 @@ export const FluidCanvas = () => {
       canvas.addEventListener("pointermove", onPointerMove);
       canvas.addEventListener("pointerup", onPointerUp);
       canvas.addEventListener("pointercancel", onPointerUp);
+      canvas.addEventListener("lostpointercapture", onLostPointerCapture);
       observer.observe(canvas);
 
       let previous = performance.now();
@@ -236,6 +245,7 @@ export const FluidCanvas = () => {
       canvas.removeEventListener("pointermove", onPointerMove);
       canvas.removeEventListener("pointerup", onPointerUp);
       canvas.removeEventListener("pointercancel", onPointerUp);
+      canvas.removeEventListener("lostpointercapture", onLostPointerCapture);
       renderer?.destroy();
       rendererRef.current = null;
       pointerRef.current = null;

@@ -107,6 +107,24 @@ const litFraction = async (page: Page): Promise<number> => {
   return pixels.filter((sum) => sum > 24).length / pixels.length;
 };
 
+/** Mean brightness near a point. Both `point` and `radius` are fractions of the
+ * canvas, because callers hold viewport-relative positions, not sample indices. */
+const meanAround = (
+  pixels: number[],
+  point: { x: number; y: number },
+  radius: number,
+): number => {
+  const height = Math.round(pixels.length / SAMPLE_WIDTH);
+  const inside: number[] = [];
+  for (const [index, value] of pixels.entries()) {
+    const x = (index % SAMPLE_WIDTH) / SAMPLE_WIDTH;
+    const y = Math.floor(index / SAMPLE_WIDTH) / height;
+    if (Math.hypot(x - point.x, y - point.y) <= radius) inside.push(value);
+  }
+  if (inside.length === 0) return -1;
+  return inside.reduce((sum, value) => sum + value, 0) / inside.length;
+};
+
 /** Mean absolute brightness change between two samples, normalised to 0..1. */
 const meanChange = (before: number[], after: number[]): number => {
   if (before.length === 0 || before.length !== after.length) return -1;
@@ -395,6 +413,80 @@ test.describe("fluid canvas", () => {
     };
 
     expect(await changeBetweenFrames()).toBeGreaterThan(0.002);
+  });
+
+  test("stops painting when the browser revokes the pointer capture", async ({
+    page,
+  }) => {
+    // Raised because each canvas read is a screenshot, which costs seconds
+    // against CI's software renderer — the default 30s ceiling is not enough.
+    test.setTimeout(180_000);
+
+    await page.goto("/?seed=off");
+    await page.evaluate(() => {
+      window.localStorage.clear();
+    });
+    await page.goto("/?seed=off");
+    await expect(page.getByRole("alert")).toHaveCount(0);
+
+    await hideSettings(page);
+
+    const viewport = page.viewportSize() ?? { width: 1280, height: 720 };
+    // Abandoned mid-canvas, away from the edges, because the disc sampled around
+    // it has to stay on the canvas in every direction.
+    const abandoned = { x: 0.5, y: 0.5 };
+    const at = (point: { x: number; y: number }): [number, number] => [
+      viewport.width * point.x,
+      viewport.height * point.y,
+    ];
+
+    await page.mouse.move(...at({ x: 0.3, y: abandoned.y }));
+    await page.mouse.down();
+    await page.mouse.move(...at(abandoned), { steps: 6 });
+
+    // Dispatched by hand because Playwright's mouse cannot revoke a capture; the
+    // id must be its own 1, since PointerEvent's default 0 matches no stroke.
+    await page.evaluate(() => {
+      document.querySelector("canvas")?.dispatchEvent(
+        new PointerEvent("lostpointercapture", {
+          bubbles: true,
+          pointerId: 1,
+        }),
+      );
+    });
+
+    // Settled first because the dye already painted keeps advecting for a
+    // while, and that motion is not what this test is about.
+    /* eslint-disable playwright/no-wait-for-timeout */
+    await page.waitForTimeout(3000);
+    const before = await sampleCanvas(page);
+
+    await page.waitForTimeout(4000);
+    /* eslint-enable playwright/no-wait-for-timeout */
+    const after = await sampleCanvas(page);
+
+    const sum = (pixels: number[]): number =>
+      pixels.reduce((total, value) => total + value, 0);
+    const localBefore = meanAround(before, abandoned, 0.06);
+
+    // Asserted before the ratio because every degenerate reading divides out to
+    // 1 and passes: an unpainted drag would otherwise verify nothing at all.
+    expect(localBefore).toBeGreaterThan(0);
+    expect(sum(before)).toBeGreaterThan(0);
+
+    // Compared against the field's own growth because dye keeps spreading
+    // either way — an absolute rise fires on both the fixed and broken builds.
+    const localGrowth = meanAround(after, abandoned, 0.06) / localBefore;
+    const fieldGrowth = sum(after) / sum(before);
+
+    // A stranded stroke re-splats its last position every frame, so its dye
+    // piles up there faster than the field as a whole moves.
+    expect(
+      localGrowth,
+      `local ${localGrowth.toFixed(3)} vs field ${fieldGrowth.toFixed(3)}`,
+    ).toBeLessThan(fieldGrowth * 1.3);
+
+    await page.mouse.up();
   });
 
   test("paints the seed burst before any input", async ({ page }) => {
