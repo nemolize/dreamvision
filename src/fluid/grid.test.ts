@@ -2,7 +2,13 @@ import { describe, expect, it } from "vitest";
 
 import { DYE_RESOLUTION, SIM_RESOLUTION, WORKGROUP_SIZE } from "./config";
 import type { Grid } from "./grid";
-import { dispatchSize, fitGrid, needsRebuild, sameGrid } from "./grid";
+import {
+  dispatchSize,
+  fitGrid,
+  fitGrids,
+  needsRebuild,
+  sameGrid,
+} from "./grid";
 import { RESOLUTION_DESCRIPTORS } from "./resolution";
 
 /** The extremes of a viewport, so a resolution the panel offers is checked
@@ -73,8 +79,6 @@ describe("sameGrid", () => {
   });
 
   it("is decided by the finer dye grid, so the sim grid alone overstates how often a resize can be skipped", () => {
-    // The renderer skips only when BOTH grids match, so the sim rate alone
-    // certifies a skip rate the guard never delivers.
     const rate = (
       steady: (width: number, height: number) => boolean,
     ): number => {
@@ -138,6 +142,21 @@ describe("needsRebuild", () => {
     expect(
       needsRebuild(pair(SIM, DYE), pair(SIM, { width: 1024, height: 575 })),
     ).toBe(true);
+  });
+
+  it("rebuilds on the first build, which has no grids to keep", () => {
+    expect(needsRebuild(null, pair(SIM, DYE))).toBe(true);
+  });
+
+  it("skips a 1px canvas step on a wide viewport but not the resize that changes a grid", () => {
+    const resolution = {
+      simResolution: SIM_RESOLUTION,
+      dyeResolution: DYE_RESOLUTION,
+    };
+    const built = fitGrids(3840, 800, resolution);
+
+    expect(needsRebuild(built, fitGrids(3841, 800, resolution))).toBe(false);
+    expect(needsRebuild(built, fitGrids(1920, 1080, resolution))).toBe(true);
   });
 });
 

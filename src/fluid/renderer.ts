@@ -1,7 +1,7 @@
 import { MAX_SPLATS_PER_FRAME, TIME_STEP, WORKGROUP_SIZE } from "./config";
 import { DoubleBuffer } from "./doubleBuffer";
-import type { Grid, GridPair } from "./grid";
-import { dispatchSize, fitGrid, needsRebuild } from "./grid";
+import type { Grid } from "./grid";
+import { dispatchSize, fitGrids, needsRebuild } from "./grid";
 import type { ProjectionScale } from "./projection";
 import { projectionScale, projectionUniform } from "./projection";
 import renderShaderSource from "./render.wgsl?raw";
@@ -239,7 +239,6 @@ export const createFluidRenderer = (
   interface Resources {
     simGrid: Grid;
     dyeGrid: Grid;
-    /** Fixed by `simGrid`, so it is resolved once per rebuild. */
     scale: ProjectionScale;
     velocity: DoubleBuffer;
     dye: DoubleBuffer;
@@ -271,16 +270,15 @@ export const createFluidRenderer = (
   let resolution: ResolutionSettings = initialResolution;
   let canvasSize = { width, height };
 
-  const fitGrids = (canvasWidth: number, canvasHeight: number): GridPair => ({
-    simGrid: fitGrid(canvasWidth, canvasHeight, resolution.simResolution),
-    dyeGrid: fitGrid(canvasWidth, canvasHeight, resolution.dyeResolution),
-  });
-
   const buildResources = (
     canvasWidth: number,
     canvasHeight: number,
   ): Resources => {
-    const { simGrid, dyeGrid } = fitGrids(canvasWidth, canvasHeight);
+    const { simGrid, dyeGrid } = fitGrids(
+      canvasWidth,
+      canvasHeight,
+      resolution,
+    );
     const scale = projectionScale(simGrid.width, simGrid.height);
 
     const velocity = new DoubleBuffer(device, simGrid, VELOCITY_FORMAT);
@@ -483,10 +481,8 @@ export const createFluidRenderer = (
    * decides, and at a square aspect it steps every pixel, so this never fires. */
   const resize = (canvasWidth: number, canvasHeight: number): void => {
     canvasSize = { width: canvasWidth, height: canvasHeight };
-    const current = resources;
     if (
-      current !== null &&
-      !needsRebuild(current, fitGrids(canvasWidth, canvasHeight))
+      !needsRebuild(resources, fitGrids(canvasWidth, canvasHeight, resolution))
     ) {
       return;
     }

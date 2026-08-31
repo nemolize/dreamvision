@@ -31,9 +31,22 @@ export interface GridPair {
   dyeGrid: Grid;
 }
 
+export const fitGrids = (
+  width: number,
+  height: number,
+  resolution: { simResolution: number; dyeResolution: number },
+): GridPair => ({
+  simGrid: fitGrid(width, height, resolution.simResolution),
+  dyeGrid: fitGrid(width, height, resolution.dyeResolution),
+});
+
 /** Either grid differing means the textures it sizes are the wrong shape, so
- * both must match for the rebuild to be skippable. */
-export const needsRebuild = (current: GridPair, next: GridPair): boolean =>
+ * both must match to skip; `null` is the first build, with nothing to keep. */
+export const needsRebuild = (
+  current: GridPair | null,
+  next: GridPair,
+): boolean =>
+  current === null ||
   !sameGrid(next.simGrid, current.simGrid) ||
   !sameGrid(next.dyeGrid, current.dyeGrid);
 
