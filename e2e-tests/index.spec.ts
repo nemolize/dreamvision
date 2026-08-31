@@ -432,13 +432,17 @@ test.describe("fluid canvas", () => {
     await hideSettings(page);
 
     const viewport = page.viewportSize() ?? { width: 1280, height: 720 };
-    const midY = viewport.height / 2;
-    // Abandoned mid-canvas, away from the edges, because the ring sampled around
+    // Abandoned mid-canvas, away from the edges, because the disc sampled around
     // it has to stay on the canvas in every direction.
     const abandoned = { x: 0.5, y: 0.5 };
-    await page.mouse.move(viewport.width * 0.3, midY);
+    const at = (point: { x: number; y: number }): [number, number] => [
+      viewport.width * point.x,
+      viewport.height * point.y,
+    ];
+
+    await page.mouse.move(...at({ x: 0.3, y: abandoned.y }));
     await page.mouse.down();
-    await page.mouse.move(viewport.width * abandoned.x, midY, { steps: 6 });
+    await page.mouse.move(...at(abandoned), { steps: 6 });
 
     // Dispatched by hand because Playwright's mouse cannot revoke a capture; the
     // id must be its own 1, since PointerEvent's default 0 matches no stroke.
@@ -461,17 +465,26 @@ test.describe("fluid canvas", () => {
     /* eslint-enable playwright/no-wait-for-timeout */
     const after = await sampleCanvas(page);
 
+    const sum = (pixels: number[]): number =>
+      pixels.reduce((total, value) => total + value, 0);
+    const localBefore = meanAround(before, abandoned, 0.06);
+
+    // Asserted before the ratio because every degenerate reading divides out to
+    // 1 and passes: an unpainted drag would otherwise verify nothing at all.
+    expect(localBefore).toBeGreaterThan(0);
+    expect(sum(before)).toBeGreaterThan(0);
+
     // Compared against the field's own growth because dye keeps spreading
     // either way — an absolute rise fires on both the fixed and broken builds.
-    const sum = (pixels: number[]): number =>
-      pixels.reduce((total, value) => total + value, 0) || 1;
-    const localGrowth =
-      meanAround(after, abandoned, 0.06) / meanAround(before, abandoned, 0.06);
+    const localGrowth = meanAround(after, abandoned, 0.06) / localBefore;
     const fieldGrowth = sum(after) / sum(before);
 
     // A stranded stroke re-splats its last position every frame, so its dye
     // piles up there faster than the field as a whole moves.
-    expect(localGrowth).toBeLessThan(fieldGrowth * 1.3);
+    expect(
+      localGrowth,
+      `local ${localGrowth.toFixed(3)} vs field ${fieldGrowth.toFixed(3)}`,
+    ).toBeLessThan(fieldGrowth * 1.3);
 
     await page.mouse.up();
   });
