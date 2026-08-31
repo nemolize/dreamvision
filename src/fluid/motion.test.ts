@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
+import { MAX_STEPS_PER_FRAME, TIME_STEP } from "./config";
 import { creditedElapsed, MotionGate, reducedMotionQuery } from "./motion";
 
 const media = (matches: boolean) => vi.fn((_query: string) => ({ matches }));
@@ -24,21 +25,30 @@ describe("reducedMotionQuery", () => {
 });
 
 describe("creditedElapsed", () => {
+  const budget = MAX_STEPS_PER_FRAME * TIME_STEP;
+
   it("passes an ordinary frame through untouched", () => {
     expect(creditedElapsed(1 / 60)).toBeCloseTo(1 / 60, 6);
-    expect(creditedElapsed(1 / 15)).toBeCloseTo(1 / 15, 6);
+    expect(creditedElapsed(1 / 120)).toBeCloseTo(1 / 120, 6);
   });
 
-  it("drops a gap far longer than a frame instead of banking it", () => {
+  it("caps a gap at what one frame can drain, so none of it banks", () => {
     // The case the hidden-tab path produces: visibilitychange reopens the gate
     // before the first resumed frame, so this gap arrives with the gate open.
-    expect(creditedElapsed(60)).toBe(0);
-    expect(creditedElapsed(2)).toBe(0);
+    expect(creditedElapsed(60)).toBeCloseTo(budget, 6);
+    expect(creditedElapsed(2)).toBeCloseTo(budget, 6);
   });
 
-  it("credits time strictly below the cap and drops it strictly above", () => {
-    expect(creditedElapsed(0.25)).toBe(0.25);
-    expect(creditedElapsed(0.2501)).toBe(0);
+  it("still advances a slow frame rather than freezing the simulation", () => {
+    // A software renderer on CI exceeds the budget every frame; returning 0 here
+    // would stop the solver entirely and the dye would never decay.
+    expect(creditedElapsed(0.5)).toBeGreaterThan(0);
+    expect(creditedElapsed(0.1)).toBeGreaterThan(0);
+  });
+
+  it("credits a frame at the budget exactly, and never more", () => {
+    expect(creditedElapsed(budget)).toBeCloseTo(budget, 6);
+    expect(creditedElapsed(budget * 10)).toBeCloseTo(budget, 6);
   });
 });
 

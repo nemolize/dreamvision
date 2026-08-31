@@ -4,10 +4,9 @@ Real-time fluid simulation filling the browser viewport, solved entirely on the
 GPU with [WebGPU](https://www.w3.org/TR/webgpu/) compute shaders. It opens
 mid-motion and settles as the dye dissipates; drag anywhere to stir it. Under
 `prefers-reduced-motion` it opens still instead, and waits for a drag or a
-keypress before it animates. A panel
-behind the gear in the corner tunes the solver live — decay rates, splat size
-and force, pressure sweeps, and the grid resolutions — and remembers what you
-set.
+keypress before it animates. A panel behind the gear in the corner tunes the
+solver live — decay rates, splat size and force, pressure sweeps, and the grid
+resolutions — and remembers what you set.
 
 Built with React + Vite and deployed to
 [Cloudflare Workers](https://workers.cloudflare.com/) as static assets.
@@ -58,9 +57,9 @@ accumulating over a drag's frames, so it is injected brighter to compensate
 
 The solver advances by a fixed timestep while the frame loop accumulates real
 elapsed time, so the fluid behaves the same on a 60Hz and a 120Hz display. A
-gap longer than a frame or so — a hidden tab, a slept machine — is dropped
-rather than replayed, so returning to the tab resumes from the present instead
-of fast-forwarding through the gap. If the GPU device is lost, the
+gap longer than one frame's budget — a hidden tab, a slept machine — is capped
+at that budget rather than banked, so returning to the tab resumes from the
+present instead of fast-forwarding through the gap. If the GPU device is lost, the
 canvas is replaced by a notice instead of freezing in place.
 
 Two grids are in play: velocity and pressure run on a coarse grid, dye on a
