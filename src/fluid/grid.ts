@@ -23,6 +23,33 @@ export const fitGrid = (
   };
 };
 
+export const sameGrid = (a: Grid, b: Grid): boolean =>
+  a.width === b.width && a.height === b.height;
+
+export interface GridPair {
+  simGrid: Grid;
+  dyeGrid: Grid;
+}
+
+export const fitGrids = (
+  width: number,
+  height: number,
+  resolution: { simResolution: number; dyeResolution: number },
+): GridPair => ({
+  simGrid: fitGrid(width, height, resolution.simResolution),
+  dyeGrid: fitGrid(width, height, resolution.dyeResolution),
+});
+
+/** Either grid differing means the textures it sizes are the wrong shape, so
+ * both must match to skip; `null` is the first build, with nothing to keep. */
+export const needsRebuild = (
+  current: GridPair | null,
+  next: GridPair,
+): boolean =>
+  current === null ||
+  !sameGrid(next.simGrid, current.simGrid) ||
+  !sameGrid(next.dyeGrid, current.dyeGrid);
+
 export const dispatchSize = (grid: Grid): [number, number] => [
   Math.ceil(grid.width / WORKGROUP_SIZE),
   Math.ceil(grid.height / WORKGROUP_SIZE),

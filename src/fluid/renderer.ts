@@ -1,7 +1,7 @@
 import { MAX_SPLATS_PER_FRAME, TIME_STEP, WORKGROUP_SIZE } from "./config";
 import { DoubleBuffer } from "./doubleBuffer";
 import type { Grid } from "./grid";
-import { dispatchSize, fitGrid } from "./grid";
+import { dispatchSize, fitGrids, needsRebuild } from "./grid";
 import type { ProjectionScale } from "./projection";
 import { projectionScale, projectionUniform } from "./projection";
 import renderShaderSource from "./render.wgsl?raw";
@@ -239,7 +239,6 @@ export const createFluidRenderer = (
   interface Resources {
     simGrid: Grid;
     dyeGrid: Grid;
-    /** Fixed by the grid and the canvas, so resolved once per resize. */
     scale: ProjectionScale;
     velocity: DoubleBuffer;
     dye: DoubleBuffer;
@@ -275,15 +274,10 @@ export const createFluidRenderer = (
     canvasWidth: number,
     canvasHeight: number,
   ): Resources => {
-    const simGrid = fitGrid(
+    const { simGrid, dyeGrid } = fitGrids(
       canvasWidth,
       canvasHeight,
-      resolution.simResolution,
-    );
-    const dyeGrid = fitGrid(
-      canvasWidth,
-      canvasHeight,
-      resolution.dyeResolution,
+      resolution,
     );
     const scale = projectionScale(simGrid.width, simGrid.height);
 
@@ -483,8 +477,15 @@ export const createFluidRenderer = (
     resources = next;
   };
 
+  /** Thins a drag's rebuild storm rather than stopping it: the finer dye grid
+   * decides, and at a square aspect it steps every pixel, so this never fires. */
   const resize = (canvasWidth: number, canvasHeight: number): void => {
     canvasSize = { width: canvasWidth, height: canvasHeight };
+    if (
+      !needsRebuild(resources, fitGrids(canvasWidth, canvasHeight, resolution))
+    ) {
+      return;
+    }
     rebuild(canvasWidth, canvasHeight);
   };
 
