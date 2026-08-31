@@ -1,22 +1,42 @@
 /** Narrower than `Window` so a caller without `matchMedia` — an older browser,
  * a bare test double — is a type the signature admits rather than a cast. */
-export interface MotionQueryView {
-  matchMedia?: (query: string) => { matches: boolean };
+export interface MotionQuery {
+  matches: boolean;
+  addEventListener?: (type: "change", listener: () => void) => void;
+  removeEventListener?: (type: "change", listener: () => void) => void;
 }
 
-export const prefersReducedMotion = (view: MotionQueryView): boolean =>
-  view.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
+export interface MotionQueryView {
+  matchMedia?: (query: string) => MotionQuery;
+}
 
-/** `MAX_STEPS_PER_FRAME` bounds the catch-up replay after an idle gap but does
- * not prevent it, so time accumulated while closed must be discarded. */
+export const reducedMotionQuery = (view: MotionQueryView): MotionQuery | null =>
+  view.matchMedia?.("(prefers-reduced-motion: reduce)") ?? null;
+
+/** Skipped rather than replayed, because `MAX_STEPS_PER_FRAME` caps only one
+ * frame's catch-up and the excess drains later as fast-forward. */
+const MAX_FRAME_GAP_SECONDS = 0.25;
+
+/** Separate from the closed-gate branch because `visibilitychange` reopens the
+ * gate before the first resumed frame, so that gap sees an open one. */
+export const creditedElapsed = (elapsed: number): number =>
+  elapsed > MAX_FRAME_GAP_SECONDS ? 0 : elapsed;
+
 export class MotionGate {
-  private readonly reducedMotion: boolean;
+  private reducedMotion: boolean;
   private hidden: boolean;
   private awaitingInput: boolean;
 
   constructor(reducedMotion: boolean, hidden: boolean) {
     this.reducedMotion = reducedMotion;
     this.hidden = hidden;
+    this.awaitingInput = reducedMotion;
+  }
+
+  /** Enabling the preference mid-session re-arms the hold, so someone who turns
+   * it on because the motion is affecting them gets stillness without a reload. */
+  setReducedMotion(reducedMotion: boolean): void {
+    this.reducedMotion = reducedMotion;
     this.awaitingInput = reducedMotion;
   }
 

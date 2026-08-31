@@ -2,7 +2,11 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { MAX_STEPS_PER_FRAME, TIME_STEP } from "@/fluid/config";
 import { GpuUnavailableError, initGpu } from "@/fluid/gpu";
-import { MotionGate, prefersReducedMotion } from "@/fluid/motion";
+import {
+  creditedElapsed,
+  MotionGate,
+  reducedMotionQuery,
+} from "@/fluid/motion";
 import { PointerTracker } from "@/fluid/pointer";
 import { createFluidRenderer } from "@/fluid/renderer";
 import type { ResolutionSettings } from "@/fluid/resolution";
@@ -96,8 +100,9 @@ export const FluidCanvas = () => {
     const pointer = new PointerTracker();
     pointer.setForce(settingsRef.current.splatForce);
     pointerRef.current = pointer;
+    const motionQuery = reducedMotionQuery(window);
     const motion = new MotionGate(
-      prefersReducedMotion(window),
+      motionQuery?.matches ?? false,
       document.hidden,
     );
     let renderer: FluidRenderer | null = null;
@@ -137,6 +142,18 @@ export const FluidCanvas = () => {
 
     const onVisibilityChange = (): void => {
       motion.setHidden(document.hidden);
+    };
+
+    const onMotionPreferenceChange = (): void => {
+      motion.setReducedMotion(motionQuery?.matches ?? false);
+    };
+
+    // Keyboard and assistive-technology users never fire pointerdown, so without
+    // this the reduced-motion hold would leave them a permanently blank canvas.
+    const onKeyDown = (event: KeyboardEvent): void => {
+      if (event.key !== "Enter" && event.key !== " ") return;
+      event.preventDefault();
+      motion.requestMotion();
     };
 
     const resizeCanvas = (): { width: number; height: number } => {
@@ -197,7 +214,9 @@ export const FluidCanvas = () => {
       canvas.addEventListener("pointerup", onPointerUp);
       canvas.addEventListener("pointercancel", onPointerUp);
       canvas.addEventListener("lostpointercapture", onLostPointerCapture);
+      canvas.addEventListener("keydown", onKeyDown);
       document.addEventListener("visibilitychange", onVisibilityChange);
+      motionQuery?.addEventListener?.("change", onMotionPreferenceChange);
       observer.observe(canvas);
 
       let previous = performance.now();
@@ -214,14 +233,12 @@ export const FluidCanvas = () => {
         previous = now;
 
         if (!motion.open) {
-          // Dropped rather than banked, so reopening resumes from the present
-          // instead of fast-forwarding through however long the gate was shut.
           owed = 0;
           frameId = requestAnimationFrame(loop);
           return;
         }
 
-        owed += elapsed;
+        owed += creditedElapsed(elapsed);
 
         const steps = Math.min(
           Math.floor(owed / TIME_STEP),
@@ -268,7 +285,9 @@ export const FluidCanvas = () => {
       canvas.removeEventListener("pointerup", onPointerUp);
       canvas.removeEventListener("pointercancel", onPointerUp);
       canvas.removeEventListener("lostpointercapture", onLostPointerCapture);
+      canvas.removeEventListener("keydown", onKeyDown);
       document.removeEventListener("visibilitychange", onVisibilityChange);
+      motionQuery?.removeEventListener?.("change", onMotionPreferenceChange);
       renderer?.destroy();
       rendererRef.current = null;
       pointerRef.current = null;
@@ -292,7 +311,7 @@ export const FluidCanvas = () => {
 
   return (
     <>
-      <canvas ref={canvasRef} aria-label="Fluid simulation" />
+      <canvas ref={canvasRef} aria-label="Fluid simulation" tabIndex={0} />
       <SettingsPanel
         settings={settings}
         resolution={resolution}

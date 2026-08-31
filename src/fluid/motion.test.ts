@@ -1,23 +1,44 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { MotionGate, prefersReducedMotion } from "./motion";
+import { creditedElapsed, MotionGate, reducedMotionQuery } from "./motion";
 
 const media = (matches: boolean) => vi.fn((_query: string) => ({ matches }));
 
-describe("prefersReducedMotion", () => {
-  it("reports the preference the browser answers with", () => {
-    expect(prefersReducedMotion({ matchMedia: media(true) })).toBe(true);
-    expect(prefersReducedMotion({ matchMedia: media(false) })).toBe(false);
+describe("reducedMotionQuery", () => {
+  it("hands back the query the browser answers with", () => {
+    expect(reducedMotionQuery({ matchMedia: media(true) })?.matches).toBe(true);
+    expect(reducedMotionQuery({ matchMedia: media(false) })?.matches).toBe(
+      false,
+    );
   });
 
   it("asks for the reduce query, not some other motion query", () => {
     const matchMedia = media(true);
-    prefersReducedMotion({ matchMedia });
+    reducedMotionQuery({ matchMedia });
     expect(matchMedia).toHaveBeenCalledWith("(prefers-reduced-motion: reduce)");
   });
 
-  it("treats a missing matchMedia as no preference", () => {
-    expect(prefersReducedMotion({})).toBe(false);
+  it("reports a missing matchMedia as no query to subscribe to", () => {
+    expect(reducedMotionQuery({})).toBeNull();
+  });
+});
+
+describe("creditedElapsed", () => {
+  it("passes an ordinary frame through untouched", () => {
+    expect(creditedElapsed(1 / 60)).toBeCloseTo(1 / 60, 6);
+    expect(creditedElapsed(1 / 15)).toBeCloseTo(1 / 15, 6);
+  });
+
+  it("drops a gap far longer than a frame instead of banking it", () => {
+    // The case the hidden-tab path produces: visibilitychange reopens the gate
+    // before the first resumed frame, so this gap arrives with the gate open.
+    expect(creditedElapsed(60)).toBe(0);
+    expect(creditedElapsed(2)).toBe(0);
+  });
+
+  it("credits time strictly below the cap and drops it strictly above", () => {
+    expect(creditedElapsed(0.25)).toBe(0.25);
+    expect(creditedElapsed(0.2501)).toBe(0);
   });
 });
 
@@ -62,6 +83,27 @@ describe("MotionGate", () => {
     expect(gate.open).toBe(false);
     gate.requestMotion();
     expect(gate.open).toBe(true);
+  });
+
+  it("re-arms the hold when the preference is switched on mid-session", () => {
+    const gate = new MotionGate(false, false);
+    expect(gate.open).toBe(true);
+
+    gate.setReducedMotion(true);
+    expect(gate.open).toBe(false);
+    expect(gate.seeds).toBe(false);
+
+    gate.requestMotion();
+    expect(gate.open).toBe(true);
+  });
+
+  it("releases a hold that was already lifted when the preference goes away", () => {
+    const gate = new MotionGate(true, false);
+    expect(gate.open).toBe(false);
+
+    gate.setReducedMotion(false);
+    expect(gate.open).toBe(true);
+    expect(gate.seeds).toBe(true);
   });
 
   it("re-closes on hide even after motion was requested", () => {
