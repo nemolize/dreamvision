@@ -115,7 +115,8 @@ without that the notice would be a dead end.
 ## Project layout
 
 - `src/fluid/` — the simulation: WGSL shaders, the WebGPU pipeline setup
-  (`renderer.ts`), device acquisition (`gpu.ts`), and pointer tracking
+  (`pipelines.ts`), the per-resolution resources (`resources.ts`), the frame
+  encoder (`frame.ts`), device acquisition (`gpu.ts`), and pointer tracking
 - `src/FluidCanvas.tsx` — the canvas host; owns the animation loop, and holds
   the settings the panel edits alongside any failure to report
 - `src/SettingsPanel.tsx` — the collapsible panel of solver controls

@@ -23,9 +23,12 @@ export default defineConfig({
         "src/App.tsx",
         "src/FluidCanvas.tsx",
         "src/fluid/doubleBuffer.ts",
+        "src/fluid/frame.ts",
         "src/fluid/gpu.ts",
+        "src/fluid/pipelines.ts",
         "src/fluid/resample.ts",
         "src/fluid/renderer.ts",
+        "src/fluid/resources.ts",
         "src/fluid/types.ts",
       ],
       thresholds: {
