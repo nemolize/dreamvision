@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { projectionScale } from "./projection";
+import simulationShaderSource from "./simulation.wgsl?raw";
 import type { Splat } from "./types";
 import {
   ADVECT_PARAM,
@@ -15,55 +16,72 @@ import {
 } from "./uniforms";
 
 /**
- * The WGSL struct layouts, transcribed by hand from `simulation.wgsl`, and the
- * packers checked against them. Inserting a member shifts every later offset
- * and the fluid still renders — just with a wrong metric, radius or dissipation
- * — so nothing in the picture names the member that moved.
+ * The host's float offsets, checked against the struct layouts read out of
+ * `simulation.wgsl` itself. Inserting a member shifts every later offset and
+ * the fluid still renders — just with a wrong metric, radius or dissipation —
+ * so nothing in the picture names the member that moved.
  *
- * Transcribed, so this checks the host's offsets against a stated layout rather
- * than against the shader: editing a struct means editing its twin here.
+ * The shader is the oracle rather than a copy of it, so editing a struct fails
+ * these tests without anyone having to remember a twin lives here.
  */
 
-/** Float width of each WGSL type, which is also its alignment: a `vec2f` aligns
- * to 8 bytes and a `vec4f` to 16, which is what leaves the holes being pinned. */
-const f32 = 1;
-const vec2f = 2;
-const vec4f = 4;
+/** Float width of each type, which is also its alignment: a `vec2f` aligns to 8
+ * bytes and a `vec4f` to 16, which is what opens the holes being pinned. */
+const FLOATS: Record<string, number> = { f32: 1, vec2f: 2, vec4f: 4 };
 
-/** Padding members are omitted: they shift later offsets only by occupying
- * space the alignment of the next member would have skipped anyway. */
-const wgslOffsets = (
-  members: readonly (readonly [string, number])[],
-): Record<string, number> => {
+/** Padding members are dropped rather than assigned an offset: they occupy only
+ * space the next member's alignment would have skipped anyway. */
+const isPadding = (name: string): boolean => name.startsWith("_pad");
+
+/** Fails loudly on an unknown type or a missing struct: silently returning a
+ * partial layout would let the assertions below pass while checking less. */
+const wgslStruct = (name: string): Record<string, number> => {
+  const body = new RegExp(`\\bstruct\\s+${name}\\s*\\{([^}]*)\\}`).exec(
+    simulationShaderSource,
+  )?.[1];
+  if (body === undefined) throw new Error(`no struct ${name} in the shader`);
+
   const offsets: Record<string, number> = {};
   let cursor = 0;
-  for (const [name, floats] of members) {
+  for (const line of body.split("\n")) {
+    const member = /^\s*(\w+)\s*:\s*(\w+)\s*,/.exec(
+      line.replace(/\/\/.*$/, ""),
+    );
+    if (member === null) continue;
+    const [, memberName, type] = member;
+    const floats = FLOATS[type ?? ""];
+    if (floats === undefined) throw new Error(`unhandled type ${type ?? ""}`);
     cursor = Math.ceil(cursor / floats) * floats;
-    offsets[name] = cursor;
+    if (memberName !== undefined && !isPadding(memberName)) {
+      offsets[memberName] = cursor;
+    }
     cursor += floats;
   }
   return offsets;
 };
 
-const UNIFORMS_STRUCT = wgslOffsets([
-  ["simSize", vec2f],
-  ["dt", f32],
-  ["aspect", f32],
-  ["toCells", vec2f],
-  ["toStored", vec2f],
-]);
+const UNIFORMS_STRUCT = wgslStruct("Uniforms");
+const SPLAT_UNIFORMS_STRUCT = wgslStruct("SplatUniforms");
+const ADVECT_PARAMS_STRUCT = wgslStruct("AdvectParams");
 
-const SPLAT_UNIFORMS_STRUCT = wgslOffsets([
-  ["point", vec2f],
-  ["delta", vec2f],
-  ["color", vec4f],
-  ["radius", f32],
-]);
+const vec2f = FLOATS["vec2f"] ?? 0;
+const vec4f = FLOATS["vec4f"] ?? 0;
 
-const ADVECT_PARAMS_STRUCT = wgslOffsets([
-  ["gridSize", vec2f],
-  ["dissipation", f32],
-]);
+/** Guards the parser itself: a regex that silently matched nothing would leave
+ * every layout empty, and `toStrictEqual({})` against an empty map would pass. */
+describe("the shader-derived layouts", () => {
+  it("finds every struct the host packs into", () => {
+    expect(Object.keys(UNIFORMS_STRUCT)).not.toHaveLength(0);
+    expect(Object.keys(SPLAT_UNIFORMS_STRUCT)).not.toHaveLength(0);
+    expect(Object.keys(ADVECT_PARAMS_STRUCT)).not.toHaveLength(0);
+  });
+
+  it("drops the padding members rather than offsetting them", () => {
+    for (const name of Object.keys(SPLAT_UNIFORMS_STRUCT)) {
+      expect(isPadding(name)).toBe(false);
+    }
+  });
+});
 
 describe("UNIFORM", () => {
   it("places every member where the shader reads it", () => {

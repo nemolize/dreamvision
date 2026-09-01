@@ -1,16 +1,3 @@
-/**
- * The float offsets the host writes at, and the packers that fill them.
- *
- * Each map mirrors a struct in `simulation.wgsl`, and WGSL's alignment rules
- * leave holes a positional array would misfill — `SplatUniforms` pads its
- * `vec2f` pair up to the `vec4f`'s 16-byte alignment. A shifted offset still
- * renders: the fluid just gets a wrong metric, radius, or dissipation, so
- * nothing in the picture names the field that moved.
- *
- * Out here rather than inside the renderer's closure so `uniforms.test.ts` can
- * reach them, for the same reason `projection.ts` documents in its own header.
- */
-
 import type { Grid } from "./grid";
 import type { ProjectionScale } from "./projection";
 import { projectionUniform } from "./projection";
