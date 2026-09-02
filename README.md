@@ -8,6 +8,11 @@ keypress before it animates. A panel behind the gear in the corner tunes the
 solver live — decay rates, splat size and force, pressure sweeps, and the grid
 resolutions — and remembers what you set.
 
+**[Open the live demo →](https://dreamvision.nemolize.workers.dev/)**
+(needs a [WebGPU-capable browser](#requirements))
+
+![The simulation a second and a half after load, the opening burst still unwinding](docs/images/hero.webp)
+
 Built with React + Vite and deployed to
 [Cloudflare Workers](https://workers.cloudflare.com/) as static assets.
 
@@ -35,7 +40,7 @@ pnpm it puts on your `PATH`. Git hooks install themselves as part of
 
 ## How it works
 
-A [stable-fluids](https://pages.cs.wisc.edu/~chaol/data/cs777/stam-stable_fluids.pdf)
+A [stable-fluids](https://www.dgp.toronto.edu/people/stam/reality/Research/pdf/ns.pdf)
 solver (Stam 1999) runs as five compute passes per frame over storage textures:
 
 1. **advect** — carry velocity along itself
@@ -89,6 +94,15 @@ tenth of a point. Doing it properly also means moving the velocity components
 onto cell faces, which advection and the splat would have to follow. Numbers and
 the options are in
 [#681](https://github.com/nemolize/dreamvision/issues/681).
+
+### The settings panel
+
+The gear opens seven sliders over the running canvas. The five solver settings
+reach the running frame as the slider moves; the two grid resolutions wait for
+the drag to end, for the reason the next section gives. All seven are stored, so
+the next load opens where you left it.
+
+![The settings panel open over the running simulation, showing its seven sliders and their current values](docs/images/settings.webp)
 
 ### What the resolution sliders cost
 
