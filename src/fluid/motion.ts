@@ -19,10 +19,10 @@ export const reducedMotionQuery = (view: MotionQueryView): MotionQuery | null =>
  * frame, and discarding those gaps would stop the simulation advancing at all. */
 const MAX_FRAME_GAP_SECONDS = MAX_STEPS_PER_FRAME * TIME_STEP;
 
-/** Separate from the closed-gate branch because `visibilitychange` reopens the
- * gate before the first resumed frame, so that gap sees an open one. */
+/** Capped for the gap `visibilitychange` lets through with the gate open;
+ * floored because rAF can timestamp before the `performance.now()` before it. */
 export const creditedElapsed = (elapsed: number): number =>
-  Math.min(elapsed, MAX_FRAME_GAP_SECONDS);
+  Math.min(Math.max(elapsed, 0), MAX_FRAME_GAP_SECONDS);
 
 export class MotionGate {
   private reducedMotion: boolean;

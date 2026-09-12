@@ -39,6 +39,12 @@ describe("creditedElapsed", () => {
     expect(creditedElapsed(2)).toBeCloseTo(budget, 6);
   });
 
+  it("floors a backwards frame, so no step is banked from nothing", () => {
+    // Because Chromium was measured giving the first rAF callback a timestamp
+    // 4.3ms before its own performance.now(); unfloored that banks a step.
+    expect(creditedElapsed(-4.3 / 1000)).toBe(0);
+  });
+
   it("still advances a slow frame rather than freezing the simulation", () => {
     // A software renderer on CI exceeds the budget every frame; returning 0 here
     // would stop the solver entirely and the dye would never decay.
