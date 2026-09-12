@@ -107,6 +107,20 @@ describe("FrameSchedule", () => {
     expect(schedule.advance(TIME_STEP * 0.9, s)).toBe(0);
   });
 
+  it("keeps the seed burst across a pause, so a background tab still opens lit", () => {
+    const seeds = [splat(0.1), splat(0.2)];
+    const schedule = new FrameSchedule(seeds);
+    const s = sink(() => []);
+
+    // A tab opened hidden is !motion.open every frame until it is shown, so
+    // the burst has to survive however many pauses precede the first step.
+    schedule.pause();
+    schedule.pause();
+
+    schedule.advance(TIME_STEP, s);
+    expect(s.frames).toEqual([seeds]);
+  });
+
   it("still steps on a backwards frame's successor, banking nothing from it", () => {
     const schedule = new FrameSchedule();
     const s = sink();
