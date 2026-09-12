@@ -1,139 +1,17 @@
-import type { Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
+import {
+  hideSettings,
+  litFraction,
+  meanAround,
+  meanBrightness,
+  meanChange,
+  sampleCanvas,
+  settleSlider,
+  stir,
+  whileHidden,
+} from "./canvas";
 import { isPreviewTarget } from "./target";
-
-/** Each pass waits a frame: a slow renderer can otherwise swallow the whole
- * drag in one frame, splatting colour but leaving velocity nearly empty. */
-const stir = async (
-  page: Page,
-  size: { width: number; height: number },
-): Promise<void> => {
-  const midY = size.height / 2;
-  await page.mouse.move(size.width * 0.3, midY);
-  await page.mouse.down();
-
-  for (let pass = 1; pass <= 4; pass++) {
-    await page.mouse.move(size.width * (0.3 + 0.1 * pass), midY, { steps: 6 });
-    await page.evaluate(
-      () => new Promise((resolve) => requestAnimationFrame(resolve)),
-    );
-  }
-
-  await page.mouse.up();
-};
-
-/** Columns each screenshot is downsampled to. */
-const SAMPLE_WIDTH = 64;
-
-/** The settings toggle sits over the canvas, and an element screenshot
- * composites it in — its lit corner otherwise counts as dye. */
-const hideSettings = async (page: Page, hidden = true): Promise<void> => {
-  await page.evaluate((on) => {
-    const id = "e2e-hide-settings";
-    document.getElementById(id)?.remove();
-    if (!on) return;
-    const style = document.createElement("style");
-    style.id = id;
-    style.textContent = ".settings { display: none; }";
-    document.head.append(style);
-  }, hidden);
-};
-
-const whileHidden = async <T>(
-  page: Page,
-  read: () => Promise<T>,
-): Promise<T> => {
-  await hideSettings(page);
-  try {
-    return await read();
-  } finally {
-    await hideSettings(page, false);
-  }
-};
-
-/** Blurs as well as fills, because a resolution row reports its value on
- * release: `fill` alone leaves the panel treating the drag as still in hand. */
-const settleSlider = async (
-  page: Page,
-  name: string,
-  value: string,
-): Promise<void> => {
-  const slider = page.getByRole("slider", { name });
-  await slider.fill(value);
-  await slider.blur();
-};
-
-/** Read through a screenshot because a WebGPU canvas does not preserve its
- * drawing buffer: `drawImage` onto a 2D canvas returns transparent black. */
-const sampleCanvas = async (page: Page): Promise<number[]> => {
-  const png = await page.getByLabel("Fluid simulation").screenshot();
-  const dataUrl = `data:image/png;base64,${png.toString("base64")}`;
-
-  return page.evaluate(
-    async ({ url, width }) => {
-      const bitmap = await createImageBitmap(await (await fetch(url)).blob());
-      const height = Math.max(
-        1,
-        Math.round((width * bitmap.height) / bitmap.width),
-      );
-      const surface = document.createElement("canvas");
-      surface.width = width;
-      surface.height = height;
-      const ctx = surface.getContext("2d");
-      if (ctx === null) return [];
-      ctx.drawImage(bitmap, 0, 0, width, height);
-
-      const { data } = ctx.getImageData(0, 0, width, height);
-      const pixels: number[] = [];
-      for (let i = 0; i < data.length; i += 4) {
-        pixels.push((data[i] ?? 0) + (data[i + 1] ?? 0) + (data[i + 2] ?? 0));
-      }
-      return pixels;
-    },
-    { url: dataUrl, width: SAMPLE_WIDTH },
-  );
-};
-
-const meanBrightness = async (page: Page): Promise<number> => {
-  const pixels = await sampleCanvas(page);
-  if (pixels.length === 0) return -1;
-  return pixels.reduce((sum, value) => sum + value, 0) / pixels.length;
-};
-
-const litFraction = async (page: Page): Promise<number> => {
-  const pixels = await sampleCanvas(page);
-  if (pixels.length === 0) return -1;
-  return pixels.filter((sum) => sum > 24).length / pixels.length;
-};
-
-/** Mean brightness near a point. Both `point` and `radius` are fractions of the
- * canvas, because callers hold viewport-relative positions, not sample indices. */
-const meanAround = (
-  pixels: number[],
-  point: { x: number; y: number },
-  radius: number,
-): number => {
-  const height = Math.round(pixels.length / SAMPLE_WIDTH);
-  const inside: number[] = [];
-  for (const [index, value] of pixels.entries()) {
-    const x = (index % SAMPLE_WIDTH) / SAMPLE_WIDTH;
-    const y = Math.floor(index / SAMPLE_WIDTH) / height;
-    if (Math.hypot(x - point.x, y - point.y) <= radius) inside.push(value);
-  }
-  if (inside.length === 0) return -1;
-  return inside.reduce((sum, value) => sum + value, 0) / inside.length;
-};
-
-/** Mean absolute brightness change between two samples, normalised to 0..1. */
-const meanChange = (before: number[], after: number[]): number => {
-  if (before.length === 0 || before.length !== after.length) return -1;
-  const total = before.reduce(
-    (sum, value, i) => sum + Math.abs(value - (after[i] ?? 0)),
-    0,
-  );
-  return total / before.length / 765;
-};
 
 test.describe("fluid canvas", () => {
   test("fills the viewport with a canvas", async ({ page }) => {
@@ -247,7 +125,9 @@ test.describe("fluid canvas", () => {
 
       await page.waitForTimeout(4000);
       /* eslint-enable playwright/no-wait-for-timeout */
-      return (await meanBrightness(page)) / before;
+      const after = await meanBrightness(page);
+      expect(after).toBeGreaterThanOrEqual(0);
+      return after / before;
     };
 
     // Nothing below the GPU boundary is observable from the DOM, so the dye's
@@ -393,7 +273,9 @@ test.describe("fluid canvas", () => {
 
     // The canvas starts black, so a lit area proves the compute passes ran and
     // the display pass sampled their output.
-    expect(await litFraction(page)).toBeLessThan(0.001);
+    const unlit = await litFraction(page);
+    expect(unlit).toBeGreaterThanOrEqual(0);
+    expect(unlit).toBeLessThan(0.001);
 
     const viewport = page.viewportSize() ?? { width: 1280, height: 720 };
     await stir(page, viewport);
@@ -474,9 +356,12 @@ test.describe("fluid canvas", () => {
     expect(localBefore).toBeGreaterThan(0);
     expect(sum(before)).toBeGreaterThan(0);
 
+    const localAfter = meanAround(after, abandoned, 0.06);
+    expect(localAfter).toBeGreaterThan(0);
+
     // Compared against the field's own growth because dye keeps spreading
     // either way — an absolute rise fires on both the fixed and broken builds.
-    const localGrowth = meanAround(after, abandoned, 0.06) / localBefore;
+    const localGrowth = localAfter / localBefore;
     const fieldGrowth = sum(after) / sum(before);
 
     // A stranded stroke re-splats its last position every frame, so its dye
