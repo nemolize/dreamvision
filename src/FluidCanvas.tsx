@@ -246,12 +246,10 @@ export const FluidCanvas = () => {
         );
         owed -= steps * TIME_STEP;
 
-        pending.push(...pointer.consume());
-
         for (let step = 0; step < steps; step++) {
-          // Drained into the first step that runs: replaying the frame's splats
-          // on each catch-up step would multiply their force by however far
-          // behind the loop had fallen.
+          // First step only, because accruing across stepless frames overflows
+          // the cap renderer.ts silently slices at, and replaying scales force.
+          if (step === 0) pending.push(...pointer.consume());
           renderer?.frame(pending);
           pending = [];
         }
