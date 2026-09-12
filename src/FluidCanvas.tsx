@@ -1,16 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { MAX_STEPS_PER_FRAME, TIME_STEP } from "@/fluid/config";
 import { GpuUnavailableError, initGpu } from "@/fluid/gpu";
-import {
-  creditedElapsed,
-  MotionGate,
-  reducedMotionQuery,
-} from "@/fluid/motion";
+import { MotionGate, reducedMotionQuery } from "@/fluid/motion";
 import { PointerTracker } from "@/fluid/pointer";
 import { createFluidRenderer } from "@/fluid/renderer";
 import type { ResolutionSettings } from "@/fluid/resolution";
 import { DEFAULT_RESOLUTION, sameResolution } from "@/fluid/resolution";
+import { FrameSchedule } from "@/fluid/schedule";
 import { seedEnabled, seedSplats } from "@/fluid/seed";
 import type { FluidSettings } from "@/fluid/settings";
 import { DEFAULT_SETTINGS } from "@/fluid/settings";
@@ -20,7 +16,7 @@ import {
   saveResolution,
   saveSettings,
 } from "@/fluid/settingsStorage";
-import type { FluidRenderer, Splat } from "@/fluid/types";
+import type { FluidRenderer } from "@/fluid/types";
 import { GpuNotice } from "@/GpuNotice";
 import { SettingsPanel } from "@/SettingsPanel";
 
@@ -220,39 +216,26 @@ export const FluidCanvas = () => {
       observer.observe(canvas);
 
       let previous = performance.now();
-      let owed = 0;
-      // Held until the first step runs: the loop may render before enough time
-      // has accumulated for a step, and the burst has to land inside one.
-      let pending: Splat[] =
+      const schedule = new FrameSchedule(
         motion.seeds && seedEnabled(window.location.search)
           ? seedSplats(Math.random)
-          : [];
+          : [],
+      );
 
       const loop = (now: number): void => {
         const elapsed = (now - previous) / 1000;
         previous = now;
 
         if (!motion.open) {
-          owed = 0;
+          schedule.pause();
           frameId = requestAnimationFrame(loop);
           return;
         }
 
-        owed += creditedElapsed(elapsed);
-
-        const steps = Math.min(
-          Math.floor(owed / TIME_STEP),
-          MAX_STEPS_PER_FRAME,
-        );
-        owed -= steps * TIME_STEP;
-
-        for (let step = 0; step < steps; step++) {
-          // First step only, because accruing across stepless frames overflows
-          // the cap renderer.ts silently slices at, and replaying scales force.
-          if (step === 0) pending.push(...pointer.consume());
-          renderer?.frame(pending);
-          pending = [];
-        }
+        schedule.advance(elapsed, {
+          consume: () => pointer.consume(),
+          frame: (splats) => renderer?.frame(splats),
+        });
 
         frameId = requestAnimationFrame(loop);
       };
