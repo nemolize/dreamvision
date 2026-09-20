@@ -317,6 +317,9 @@ test.describe("fluid canvas", () => {
     // Abandoned mid-canvas, away from the edges, because the disc sampled around
     // it has to stay on the canvas in every direction.
     const abandoned = { x: 0.5, y: 0.5 };
+    // On the drag's own path but short of its end: painted, so it decays
+    // under the same rate as `abandoned`, but never re-splatted.
+    const control = { x: 0.35, y: 0.5 };
     const at = (point: { x: number; y: number }): [number, number] => [
       viewport.width * point.x,
       viewport.height * point.y,
@@ -347,29 +350,30 @@ test.describe("fluid canvas", () => {
     /* eslint-enable playwright/no-wait-for-timeout */
     const after = await sampleCanvas(page);
 
-    const sum = (pixels: number[]): number =>
-      pixels.reduce((total, value) => total + value, 0);
     const localBefore = meanAround(before, abandoned, 0.06);
+    const controlBefore = meanAround(before, control, 0.06);
 
-    // Asserted before the ratio because every degenerate reading divides out to
-    // 1 and passes: an unpainted drag would otherwise verify nothing at all.
+    // Asserted before the delta because every degenerate reading is 0 and
+    // passes: an unpainted drag would otherwise verify nothing at all.
     expect(localBefore).toBeGreaterThan(0);
-    expect(sum(before)).toBeGreaterThan(0);
 
     const localAfter = meanAround(after, abandoned, 0.06);
+    const controlAfter = meanAround(after, control, 0.06);
     expect(localAfter).toBeGreaterThan(0);
+    expect(controlBefore).toBeGreaterThanOrEqual(0);
+    expect(controlAfter).toBeGreaterThanOrEqual(0);
 
-    // Compared against the field's own growth because dye keeps spreading
-    // either way — an absolute rise fires on both the fixed and broken builds.
-    const localGrowth = localAfter / localBefore;
-    const fieldGrowth = sum(after) / sum(before);
+    // Delta against the control, not a field-relative ratio — the field-wide
+    // ratio lands inside the broken build's own recorded range even on a fixed build (#725).
+    const localDelta = localAfter - localBefore;
+    const controlDelta = controlAfter - controlBefore;
 
     // A stranded stroke re-splats its last position every frame, so its dye
-    // piles up there faster than the field as a whole moves.
+    // rises there while the control, painted but never re-splatted, only decays.
     expect(
-      localGrowth,
-      `local ${localGrowth.toFixed(3)} vs field ${fieldGrowth.toFixed(3)}`,
-    ).toBeLessThan(fieldGrowth * 1.3);
+      localDelta,
+      `local ${localDelta.toFixed(3)} vs control ${controlDelta.toFixed(3)}`,
+    ).toBeLessThanOrEqual(Math.max(controlDelta, 0));
 
     await page.mouse.up();
   });
