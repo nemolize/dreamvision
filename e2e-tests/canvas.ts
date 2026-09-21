@@ -1,67 +1,6 @@
 import type { Page } from "@playwright/test";
 
-/** Each pass waits a frame: a slow renderer can otherwise swallow the whole
- * drag in one frame, splatting colour but leaving velocity nearly empty. */
-export const stir = async (
-  page: Page,
-  size: { width: number; height: number },
-): Promise<void> => {
-  const midY = size.height / 2;
-  await page.mouse.move(size.width * 0.3, midY);
-  await page.mouse.down();
-
-  for (let pass = 1; pass <= 4; pass++) {
-    await page.mouse.move(size.width * (0.3 + 0.1 * pass), midY, { steps: 6 });
-    await page.evaluate(
-      () => new Promise((resolve) => requestAnimationFrame(resolve)),
-    );
-  }
-
-  await page.mouse.up();
-};
-
 const SAMPLE_WIDTH = 64;
-
-/** The settings toggle sits over the canvas, and an element screenshot
- * composites it in — its lit corner otherwise counts as dye. */
-export const hideSettings = async (
-  page: Page,
-  hidden = true,
-): Promise<void> => {
-  await page.evaluate((on) => {
-    const id = "e2e-hide-settings";
-    document.getElementById(id)?.remove();
-    if (!on) return;
-    const style = document.createElement("style");
-    style.id = id;
-    style.textContent = ".settings { display: none; }";
-    document.head.append(style);
-  }, hidden);
-};
-
-export const whileHidden = async <T>(
-  page: Page,
-  read: () => Promise<T>,
-): Promise<T> => {
-  await hideSettings(page);
-  try {
-    return await read();
-  } finally {
-    await hideSettings(page, false);
-  }
-};
-
-/** Blurs as well as fills, because a resolution row reports its value on
- * release: `fill` alone leaves the panel treating the drag as still in hand. */
-export const settleSlider = async (
-  page: Page,
-  name: string,
-  value: string,
-): Promise<void> => {
-  const slider = page.getByRole("slider", { name });
-  await slider.fill(value);
-  await slider.blur();
-};
 
 /** Read through a screenshot because a WebGPU canvas does not preserve its
  * drawing buffer: `drawImage` onto a 2D canvas returns transparent black. */
@@ -80,7 +19,9 @@ export const sampleCanvas = async (page: Page): Promise<number[]> => {
       surface.width = width;
       surface.height = height;
       const ctx = surface.getContext("2d");
-      if (ctx === null) return [];
+      if (ctx === null) {
+        throw new Error("Cannot sample canvas: 2D context unavailable");
+      }
       ctx.drawImage(bitmap, 0, 0, width, height);
 
       const { data } = ctx.getImageData(0, 0, width, height);
@@ -94,11 +35,8 @@ export const sampleCanvas = async (page: Page): Promise<number[]> => {
   );
 };
 
-/** -1 when the canvas could not be sampled, so assert with a lower bound: an
- * upper-bound assertion passes on the sentinel. */
 export const meanBrightness = async (page: Page): Promise<number> => {
   const pixels = await sampleCanvas(page);
-  if (pixels.length === 0) return -1;
   return pixels.reduce((sum, value) => sum + value, 0) / pixels.length;
 };
 
@@ -106,10 +44,8 @@ export const meanBrightness = async (page: Page): Promise<number> => {
  * black frame does not read as paint. */
 const LIT_THRESHOLD = 24;
 
-/** -1 when the canvas could not be sampled — see `meanBrightness`. */
 export const litFraction = async (page: Page): Promise<number> => {
   const pixels = await sampleCanvas(page);
-  if (pixels.length === 0) return -1;
   return pixels.filter((sum) => sum > LIT_THRESHOLD).length / pixels.length;
 };
 
