@@ -1,16 +1,19 @@
 import { expect, test } from "@playwright/test";
 
 import {
-  hideSettings,
   litFraction,
   meanAround,
   meanBrightness,
   meanChange,
   sampleCanvas,
+} from "./canvas";
+import {
+  freshPage,
+  hideSettings,
   settleSlider,
   stir,
   whileHidden,
-} from "./canvas";
+} from "./interactions";
 import { isPreviewTarget } from "./target";
 
 test.describe("fluid canvas", () => {
@@ -75,11 +78,7 @@ test.describe("fluid canvas", () => {
   test("stores a setting on its own, without waiting for the page to hide", async ({
     page,
   }) => {
-    await page.goto("/");
-    await page.evaluate(() => {
-      window.localStorage.clear();
-    });
-    await page.goto("/");
+    await freshPage(page, "/");
     await page.getByRole("button", { name: "Open settings" }).click();
     await page.getByRole("slider", { name: "Splat force" }).fill("64");
 
@@ -102,12 +101,7 @@ test.describe("fluid canvas", () => {
     test.setTimeout(180_000);
 
     const retentionAtDecay = async (decay: string): Promise<number> => {
-      await page.goto("/?seed=off");
-      await page.evaluate(() => {
-        window.localStorage.clear();
-      });
-      await page.goto("/?seed=off");
-      await expect(page.getByRole("alert")).toHaveCount(0);
+      await freshPage(page, "/?seed=off");
 
       await page.getByRole("button", { name: "Open settings" }).click();
       await page.getByRole("slider", { name: "Dye decay" }).fill(decay);
@@ -146,12 +140,7 @@ test.describe("fluid canvas", () => {
     // against CI's software renderer — the default 30s ceiling is not enough.
     test.setTimeout(180_000);
 
-    await page.goto("/?seed=off");
-    await page.evaluate(() => {
-      window.localStorage.clear();
-    });
-    await page.goto("/?seed=off");
-    await expect(page.getByRole("alert")).toHaveCount(0);
+    await freshPage(page, "/?seed=off");
 
     await page.getByRole("button", { name: "Open settings" }).click();
     // Held still so the reads either side of the rebuild differ by the rebuild
@@ -192,12 +181,7 @@ test.describe("fluid canvas", () => {
     // against CI's software renderer — the default 30s ceiling is not enough.
     test.setTimeout(180_000);
 
-    await page.goto("/?seed=off");
-    await page.evaluate(() => {
-      window.localStorage.clear();
-    });
-    await page.goto("/?seed=off");
-    await expect(page.getByRole("alert")).toHaveCount(0);
+    await freshPage(page, "/?seed=off");
 
     await page.getByRole("button", { name: "Open settings" }).click();
     const sim = page.getByRole("slider", { name: "Sim grid" });
@@ -225,11 +209,7 @@ test.describe("fluid canvas", () => {
   });
 
   test("restores a changed resolution after a reload", async ({ page }) => {
-    await page.goto("/");
-    await page.evaluate(() => {
-      window.localStorage.clear();
-    });
-    await page.goto("/");
+    await freshPage(page, "/");
     await page.getByRole("button", { name: "Open settings" }).click();
 
     const initial = await page
@@ -304,12 +284,7 @@ test.describe("fluid canvas", () => {
     // against CI's software renderer — the default 30s ceiling is not enough.
     test.setTimeout(180_000);
 
-    await page.goto("/?seed=off");
-    await page.evaluate(() => {
-      window.localStorage.clear();
-    });
-    await page.goto("/?seed=off");
-    await expect(page.getByRole("alert")).toHaveCount(0);
+    await freshPage(page, "/?seed=off");
 
     await hideSettings(page);
 
