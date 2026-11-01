@@ -14,66 +14,116 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  Lint:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 10
-
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: nemolize/actions/setup@ffbe3737f01cb4e563dd19424761da8c3c9a9173 # v1.2.0
-      - run: pnpm run lint
-
-  Test:
-    runs-on: ubuntu-24.04
+  Checks:
+    runs-on: ubuntu-26.04
     timeout-minutes: 10
     permissions:
       contents: read
       pull-requests: write
 
+    # Every step after setup runs past an earlier failure, so one run names
+    # every failing check instead of hiding the later ones behind the first.
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: nemolize/actions/setup@ffbe3737f01cb4e563dd19424761da8c3c9a9173 # v1.2.0
-      - id: test
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      - id: setup
+        uses: nemolize/actions/setup@v1.4.1
+      - run: pnpm run lint
+      - if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
+        id: zizmor-version
+        name: Read the zizmor version pinned in mise.toml
+        run: |
+          version="$(mise current zizmor)"
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+      - if: ${{ !cancelled() && steps.zizmor-version.outcome == 'success' }}
+        uses: zizmorcore/zizmor-action@v0.8.0
+        with:
+          version: ${{ steps.zizmor-version.outputs.version }}
+          # SARIF upload needs code scanning, which a private repository only
+          # gets with GitHub Code Security; off, findings fail this step instead.
+          advanced-security: false
+      - if: ${{ !cancelled() }}
+        name: Verify the workflow lockfile
+        run: |
+          gh extension install github/gh-actions-lock --pin v0.4.0
+          gh actions-lock --verify
+        env:
+          GH_TOKEN: ${{ github.token }}
+      - if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
+        id: test
         run: pnpm run test:coverage
       # Keyed on the test step, not the job: a failure before it leaves no report,
-      # and the reader's own error would then bury the real one. `!cancelled()`
-      # is what stops the implicit `success()` from skipping these on red tests.
+      # and the reader's own error would then bury the real one.
       - if: ${{ !cancelled() && (steps.test.outcome == 'success' || steps.test.outcome == 'failure') }}
         name: Write the coverage report to the job summary
-        uses: davelosert/vitest-coverage-report-action@8b157684c6a6b259b97d45e72b44242865c0f6a5 # v2.12.2
+        uses: davelosert/vitest-coverage-report-action@v2.13.1
         with:
           comment-on: none
-
-  Build:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 10
-
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: nemolize/actions/setup@ffbe3737f01cb4e563dd19424761da8c3c9a9173 # v1.2.0
-      - run: pnpm run build
+      - if: ${{ !cancelled() && (steps.test.outcome == 'success' || steps.test.outcome == 'failure') }}
+        id: table
+        name: Render the coverage summary as a table
+        run: |
+          {
+            echo 'markdown<<COVERAGE'
+            if [ -f coverage/coverage-summary.json ]; then
+              printf '### Coverage\n\n| | metric | %% | covered |\n| --- | --- | --- | --- |\n'
+              jq -r '.total as $t
+                | ["statements", "branches", "functions", "lines"][] as $m
+                | $t[$m]
+                | "| \(if .pct >= 90 then "🟢" elif .pct >= 80 then "🟠" else "🔴" end) | \($m) | \(.pct)% | \(.covered)/\(.total) |"' \
+                coverage/coverage-summary.json
+              printf '\n🟢 90%% and above · 🟠 80–89%% · 🔴 below 80%%\n'
+            fi
+            echo COVERAGE
+          } >> "$GITHUB_OUTPUT"
+      - if: ${{ !cancelled() && (steps.test.outcome == 'success' || steps.test.outcome == 'failure') }}
+        name: Write the coverage report into the PR description
+        uses: nemolize/actions/upsert@v1.4.1
+        with:
+          marker: coverage
+          body: ${{ steps.table.outputs.markdown }}
+          # A run that failed before writing the summary leaves the last table standing.
+          on-empty: skip
+      - if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
+        run: pnpm run build
 
   E2ETests:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 20
     container:
-      image: mcr.microsoft.com/playwright:v1.62.1-noble
+      image: mcr.microsoft.com/playwright:v1.64.1-noble@sha256:47b510dd9230bf0b9bfc9b20102241e577ea7a99334ab4c3ca19f19770e9b8ea
       # Without --ipc=host chromium can run out of memory and crash.
       options: --init --ipc=host
 
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
       # checkout's own safe.directory lasts only for its step; the `prepare`
       # script (`lefthook install`) that `pnpm install` runs needs it too.
       - run: git config --global --add safe.directory "$(pwd)"
-      - uses: nemolize/actions/setup@ffbe3737f01cb4e563dd19424761da8c3c9a9173 # v1.2.0
+      - uses: nemolize/actions/setup@v1.4.1
       - name: Assert the image ships the Playwright version we depend on
         run: |
           img="$(node -e "process.stdout.write(JSON.parse(require('fs').readFileSync('/ms-playwright/.docker-info', 'utf8')).driverVersion)")"
           pt="$(node -p "require('@playwright/test/package.json').version")"
           pw="$(node -p "require('playwright/package.json').version")"
           if [ "$pt" != "$img" ] || [ "$pw" != "$img" ]; then
-            echo "::error::image ships Playwright $img, but @playwright/test is $pt and playwright is $pw; update this job's container image tag to v$pt"
+            echo "::error::image ships Playwright $img, but @playwright/test is $pt and playwright is $pw; update this job's container image tag to v$pt-noble and its matching digest"
             exit 1
           fi
-      - run: pnpm run test:e2e
+      - id: e2e
+        run: pnpm run test:e2e
+      - if: ${{ !cancelled() && (steps.e2e.outcome == 'success' || steps.e2e.outcome == 'failure') }}
+        name: Upload the Playwright test results
+        uses: actions/upload-artifact@v7.0.2
+        with:
+          name: playwright-test-results
+          path: test-results/
+          # A run with no retry leaves only the hidden .last-run.json, which the
+          # include-hidden-files default skips — so there is nothing to upload.
+          if-no-files-found: ignore
+          # Uploading a name that already exists fails, which a re-run would hit.
+          overwrite: true
+          retention-days: 7

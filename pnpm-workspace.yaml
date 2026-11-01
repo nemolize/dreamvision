@@ -1,4 +1,13 @@
+packages:
+  - deploy
 allowBuilds:
   esbuild: true
   lefthook: true
+  sharp: true
   workerd: true
+blockExoticSubdeps: true
+minimumReleaseAge: 4320
+trustPolicy: no-downgrade
+trustPolicyExclude:
+  - lefthook@2.2.2
+  - semver@6.3.1

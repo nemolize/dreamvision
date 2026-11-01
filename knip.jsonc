@@ -1,0 +1,14 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  // Not an npm package: zizmor comes from mise.toml.
+  "ignoreBinaries": ["zizmor"],
+  "workspaces": {
+    ".": {
+      "project": ["**/*.{js,cjs,mjs,jsx,ts,cts,mts,tsx}"],
+    },
+    // The Deploy job runs it through wrangler-action; nothing imports it.
+    "deploy": {
+      "ignoreDependencies": ["wrangler"],
+    },
+  },
+}

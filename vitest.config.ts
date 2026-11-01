@@ -1,15 +1,25 @@
-import path from "node:path";
-
-import { defineConfig } from "vitest/config";
+import { configDefaults, defineConfig } from "vitest/config";
 
 export default defineConfig({
   test: {
-    environment: "happy-dom",
-    globals: true,
-    include: ["src/**/*.{test,spec}.{js,ts,tsx}", "*.{test,spec}.{js,ts}"],
-    exclude: ["e2e-tests/**/*", "node_modules/**/*"],
+    exclude: [...configDefaults.exclude, "e2e-tests/**"],
+    projects: [
+      {
+        test: {
+          name: "dom",
+          environment: "happy-dom",
+          setupFiles: ["./src/test-setup.ts"],
+          include: ["src/**/*.{test,spec}.{js,ts,tsx}"],
+        },
+      },
+      {
+        test: {
+          name: "node",
+          include: ["*.{test,spec}.{js,ts}"],
+        },
+      },
+    ],
     coverage: {
-      provider: "v8",
       // json + json-summary feed the coverage report action in CI.
       reporter: ["text", "html", "json", "json-summary"],
       reportOnFailure: true,
@@ -19,6 +29,7 @@ export default defineConfig({
       exclude: [
         "src/**/*.{test,spec}.*",
         "src/**/*.d.ts",
+        "src/test-setup.ts",
         "src/main.tsx",
         "src/App.tsx",
         "src/FluidCanvas.tsx",
@@ -41,8 +52,6 @@ export default defineConfig({
     },
   },
   resolve: {
-    alias: {
-      "@": path.resolve(import.meta.dirname, "./src"),
-    },
+    tsconfigPaths: true,
   },
 });

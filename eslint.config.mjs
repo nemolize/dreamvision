@@ -3,6 +3,8 @@ import { fileURLToPath } from "node:url";
 import { includeIgnoreFile } from "@eslint/compat";
 import js from "@eslint/js";
 import vitest from "@vitest/eslint-plugin";
+import { defineConfig } from "eslint/config";
+import jsxA11y from "eslint-plugin-jsx-a11y-x";
 import playwright from "eslint-plugin-playwright";
 import reactHooks from "eslint-plugin-react-hooks";
 import simpleImportSort from "eslint-plugin-simple-import-sort";
@@ -10,7 +12,7 @@ import unusedImports from "eslint-plugin-unused-imports";
 import globals from "globals";
 import tseslint from "typescript-eslint";
 
-export default tseslint.config(
+export default defineConfig(
   includeIgnoreFile(fileURLToPath(new URL(".gitignore", import.meta.url))),
   // Warnings do not fail `eslint .`, so a disable directive that no longer
   // suppresses anything would otherwise survive CI indefinitely.
@@ -60,11 +62,14 @@ export default tseslint.config(
     extends: [tseslint.configs.disableTypeChecked],
   },
   {
+    files: ["**/*.{jsx,tsx}"],
+    extends: [jsxA11y.configs.strict],
+  },
+  {
     files: ["**/*.{test,spec}.{js,ts,jsx,tsx}"],
     // The E2E specs match this glob too, but they run under Playwright.
     ignores: ["e2e-tests/**"],
     extends: [vitest.configs.recommended],
-    languageOptions: { globals: globals.vitest },
     rules: {
       // Errors because a warning does not fail the lint script. `.skipIf()`
       // remains for the run-time-conditional case.

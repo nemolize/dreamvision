@@ -16,9 +16,63 @@ concurrency:
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
+  Build:
+    runs-on: ubuntu-26.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: write
+    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
+
+    steps:
+      - if: ${{ github.event_name == 'pull_request' }}
+        name: Show wip message in sticky comment
+        uses: marocchino/sticky-pull-request-comment@v3.0.5
+        with:
+          message: "Version Preview URL: ⏳deployment is in progress..."
+
+      - uses: actions/checkout@v7.0.1
+        with:
+          # Keeps GITHUB_TOKEN out of .git/config, where build code could read it.
+          persist-credentials: false
+      - uses: nemolize/actions/setup@v1.4.1
+
+      - run: pnpm run build
+
+      - name: Assert the build still emits its asset exclusions
+        run: |
+          test -f dist/.assetsignore
+          grep -Fxq '.dev.vars' dist/.assetsignore
+
+      - name: Upload the build output
+        uses: actions/upload-artifact@v7.0.2
+        with:
+          name: worker-dist
+          # Deploy runs off the tracked wrangler.json, so dropping the generated
+          # one costs nothing and beats trusting .assetsignore, whose gitignore
+          # syntax could re-include it through a later negation.
+          path: |
+            dist/
+            !dist/wrangler.json
+            !dist/.dev.vars
+          # Hidden files are excluded by default, which would drop .assetsignore.
+          include-hidden-files: true
+          if-no-files-found: error
+          # Artifacts are immutable, so a re-run would otherwise fail on the name.
+          overwrite: true
+          # Match GitHub's 30-day window for retrying Deploy without rebuilding.
+          retention-days: 30
+
+      - if: ${{ failure() && github.event_name == 'pull_request' }}
+        name: Show build error in sticky comment
+        uses: marocchino/sticky-pull-request-comment@v3.0.5
+        with:
+          message: "Version Preview URL: ❌deployment failed during build."
+
   Deploy:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    needs: Build
+    runs-on: ubuntu-26.04
+    timeout-minutes: 10
     permissions:
       contents: read
       pull-requests: write
@@ -26,33 +80,128 @@ jobs:
     environment:
       name: ${{ github.ref == 'refs/heads/main' && 'production' || 'preview' }}
       url: ${{ steps.deploy.outputs.deployment-url }}
+
     steps:
-      - if: ${{ github.event_name == 'pull_request' }}
-        name: Show wip message in sticky comment
-        uses: marocchino/sticky-pull-request-comment@5770ad5eb8f42dd2c4f34da00c94c5381e49af88 # v3.0.5
+      # First, so no later step reaches a host outside this list.
+      - uses: bullfrogsec/bullfrog@v0.11.1
         with:
-          message: "Version Preview URL: ⏳deployment is in progress..."
+          egress-policy: block
+          # Raw-IP packets bypass the filter, and sudo is what can send them.
+          enable-sudo: false
+          # Artifact storage, as GitHub's Copilot allowlist reference lists it;
+          # *.blob.core.windows.net would admit any Azure storage account.
+          # release-assets.githubusercontent.com: where setup-node's Node download redirects.
+          allowed-domains: |
+            github.com
+            api.github.com
+            *.actions.githubusercontent.com
+            productionresultssa0.blob.core.windows.net
+            productionresultssa1.blob.core.windows.net
+            productionresultssa2.blob.core.windows.net
+            productionresultssa3.blob.core.windows.net
+            productionresultssa4.blob.core.windows.net
+            productionresultssa5.blob.core.windows.net
+            productionresultssa6.blob.core.windows.net
+            productionresultssa7.blob.core.windows.net
+            productionresultssa8.blob.core.windows.net
+            productionresultssa9.blob.core.windows.net
+            productionresultssa10.blob.core.windows.net
+            productionresultssa11.blob.core.windows.net
+            productionresultssa12.blob.core.windows.net
+            productionresultssa13.blob.core.windows.net
+            productionresultssa14.blob.core.windows.net
+            productionresultssa15.blob.core.windows.net
+            productionresultssa16.blob.core.windows.net
+            productionresultssa17.blob.core.windows.net
+            productionresultssa18.blob.core.windows.net
+            productionresultssa19.blob.core.windows.net
+            registry.npmjs.org
+            api.cloudflare.com
+            release-assets.githubusercontent.com
 
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: nemolize/actions/setup@ffbe3737f01cb4e563dd19424761da8c3c9a9173 # v1.2.0
+      # Deploying from the build's own dist/wrangler.json would let it pick what
+      # runs here, since a wrangler config can carry an executable build.command.
+      - uses: actions/checkout@v7.0.1
+        with:
+          sparse-checkout: |
+            wrangler.json
+            mise.toml
+            pnpm-workspace.yaml
+            pnpm-lock.yaml
+            deploy/package.json
+          sparse-checkout-cone-mode: false
+          persist-credentials: false
 
-      - run: pnpm run build
+      - name: Download the build output
+        uses: actions/download-artifact@v8.0.2
+        with:
+          name: worker-dist
+          path: dist
+
+      - name: Assert nothing publishable slipped into the restored output
+        run: |
+          test ! -e dist/wrangler.json
+          test ! -e dist/.dev.vars
+          test -f dist/.assetsignore
+
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version-file: mise.toml
+          package-manager-cache: false
+
+      # From the npm registry, so the egress allowlist gains no host.
+      - name: Install the pnpm that mise.toml pins
+        run:
+          | # zizmor: ignore[adhoc-packages] pnpm itself, at the exact mise.toml pin
+          want_pnpm="$(sed -nE "s/^pnpm *= *[\"']([0-9]+\.[0-9]+\.[0-9]+)[\"'].*/\1/p" mise.toml)"
+          if [ -z "${want_pnpm}" ]; then
+            echo "::error::mise.toml must pin pnpm as an exact x.y.z string, e.g. pnpm = \"12.16.1\""
+            exit 1
+          fi
+          npm install --global --ignore-scripts "pnpm@${want_pnpm}"
+
+      # wrangler-action would otherwise install it itself, after setting the token.
+      # Without the root package.json, only deploy/'s dependencies are installed.
+      - name: Install wrangler before the token is in scope
+        run: pnpm install --frozen-lockfile --ignore-scripts --filter deploy
+
+      - name: Check the Node version against its pin
+        run: |
+          want_node="$(sed -nE "s/^node *= *[\"']([0-9]+\.[0-9]+\.[0-9]+)[\"'].*/\1/p" mise.toml)"
+          if [ -z "${want_node}" ]; then
+            echo "::error::mise.toml must pin node as an exact x.y.z string, e.g. node = \"24.22.2\""
+            exit 1
+          fi
+          got_node="$(node --version)"
+          echo "node ${got_node} (mise.toml pins ${want_node})"
+          test "${got_node}" = "v${want_node}"
+
+      - name: Log the wrangler version
+        run: node -p '"wrangler " + require("./deploy/node_modules/wrangler/package.json").version'
 
       - id: deploy
         name: Deploy
-        uses: cloudflare/wrangler-action@ebbaa1584979971c8614a24965b4405ff95890e0 # v4.0.0
+        uses: cloudflare/wrangler-action@v4.1.3
+        env:
+          # Its telemetry host is not allowlisted, and the blocked call stalls exit.
+          WRANGLER_SEND_METRICS: "false"
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          command: ${{ github.ref == 'refs/heads/main' && 'deploy' || 'versions upload' }}
+          packageManager: pnpm
+          # With no wranglerVersion, the action uses the wrangler it finds from here.
+          workingDirectory: deploy
+          # `--env=` names the top-level environment; with env.preview defined,
+          # a bare `deploy` warns that no environment was selected.
+          command: ${{ github.ref == 'refs/heads/main' && 'deploy -c ../wrangler.json --env=' || 'versions upload -c ../wrangler.json --env preview' }}
 
       - if: ${{ github.event_name == 'pull_request' }}
         name: Show version preview URL in sticky comment
-        uses: marocchino/sticky-pull-request-comment@5770ad5eb8f42dd2c4f34da00c94c5381e49af88 # v3.0.5
+        uses: marocchino/sticky-pull-request-comment@v3.0.5
         with:
           message: "Version Preview URL: ${{ steps.deploy.outputs.deployment-url || '⚠️ no URL returned — is the workers.dev subdomain enabled?' }}"
 
       - if: ${{ failure() && github.event_name == 'pull_request' }}
         name: Show error message in sticky comment
-        uses: marocchino/sticky-pull-request-comment@5770ad5eb8f42dd2c4f34da00c94c5381e49af88 # v3.0.5
+        uses: marocchino/sticky-pull-request-comment@v3.0.5
         with:
           message: "Version Preview URL: ❌deployment failed."

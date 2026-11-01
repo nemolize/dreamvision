@@ -1,0 +1,49 @@
+name: Documentation
+description: A doc that is wrong, missing or unclear
+labels: ["type:docs"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        For documentation-only work — a doc that is wrong, missing or unclear.
+        Code, tooling and dependency work belongs in the Chore form.
+
+  - type: textarea
+    id: what
+    attributes:
+      label: What needs doing
+      description: |
+        The work itself. Quote the line that is wrong, or say where the missing
+        text belongs, and say what it should say.
+    validations:
+      required: true
+
+  - type: textarea
+    id: why
+    attributes:
+      label: Why now
+      description: |
+        What is worse while this stays undone. Routine upkeep with no trigger
+        beyond itself is a fine answer — say so in one line.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      description: |
+        There is no docs layer. Pick the layer the passage you are reporting
+        describes (the README's CI section is ci); for a passage about the
+        project as a whole, such as setup or overview, pick build.
+      options:
+        - "not sure"
+        - "ui — screens, components, styles"
+        - "sim — WebGPU simulation and shaders (src/fluid)"
+        - "build — build, compile, lint/format config, dependencies"
+        - "ci — CI pipelines and git hooks"
+        - "test — test suites and coverage config"
+        - "infra — deployment target and runtime environment"
+      default: 0
+    validations:
+      required: true
