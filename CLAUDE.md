@@ -5,9 +5,9 @@ Guidance for Claude Code (claude.ai/code) working in this repository.
 ## Issue labels
 
 Every issue carries a `type:` label, and every issue that is not an
-investigation also carries `severity:` and `area:`. For a generated repository,
-create the labels listed below through GitHub before using the issue forms.
-A form applies a label only when it already exists.
+investigation also carries `severity:` and `area:`. Create the labels listed
+below through GitHub before using the issue forms. A form applies a label only
+when it already exists.
 
 ### Filing an issue yourself
 
@@ -48,26 +48,25 @@ week-long refactor that changes no behaviour is `low`.
 | `severity:medium` | Affects some users but core functions still work, or a workaround exists |
 | `severity:low`    | Affects few users, or is largely cosmetic                                |
 
-**Core functionality here is that a generated project builds, tests, and
-deploys.** `pnpm run build`, the checks CI runs, and `pnpm run deploy` reaching
-Cloudflare Workers — anything that stops one of those for every user of the
-template is `high`. A project generated from this template replaces that
-sentence with the flows its own users would lose: the screens and API calls an
-app exists for, the public API of a library.
+**Core functionality here is that the simulation runs.** The page paints the
+fluid on the GPU and reacts to a pointer drag, the settings persist, and
+`pnpm run build`, the checks CI runs and `pnpm run deploy` still succeed —
+anything that stops one of those for every user is `high`. The notice shown on
+a browser without WebGPU is part of the contract too.
 
 **`type:investigation` takes no severity.** Its impact is what the
 investigation exists to find out, and recording an unmeasured impact as `low`
 is indistinguishable from having measured it. Apply severity to the follow-up
 issue the answer produces, not to the question.
 
-`area:` — the layer the work starts in. The set here matches this template's
+`area:` — the layer the work starts in. The set here matches this repository's
 layers; a project that grows different ones updates its labels and the Area
 dropdown in each form together.
 
 | Label        | Covers                                           |
 | ------------ | ------------------------------------------------ |
 | `area:ui`    | Screens, components, styles                      |
-| `area:api`   | Server-side request handling and business logic  |
+| `area:sim`   | WebGPU simulation and shaders (`src/fluid`)      |
 | `area:build` | Build, compile, lint/format config, dependencies |
 | `area:ci`    | CI pipelines and git hooks                       |
 | `area:test`  | Test suites and coverage config                  |

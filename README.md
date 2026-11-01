@@ -25,8 +25,8 @@ here than broad reach.
 
 ## Getting Started
 
-- [mise](https://mise.jdx.dev/) provisions Node.js and pnpm at the versions
-  pinned in `mise.toml`.
+- [mise](https://mise.jdx.dev/) provisions Node.js, pnpm and zizmor (which
+  `pnpm lint` runs) at the versions pinned in `mise.toml`.
 
 ```bash
 mise install
@@ -141,16 +141,18 @@ without that the notice would be a dead end.
 
 ## Scripts
 
-| Script                   | What it does                                       |
-| ------------------------ | -------------------------------------------------- |
-| `pnpm dev`               | Start the development server                       |
-| `pnpm build`             | Production build                                   |
-| `pnpm preview`           | Serve the production build on the Workers runtime  |
-| `pnpm lint`              | ESLint + type-check + Prettier check (in parallel) |
-| `pnpm fix`               | Auto-fix ESLint and Prettier issues                |
-| `pnpm test`              | Unit tests (Vitest)                                |
-| `pnpm run test:coverage` | Unit tests with coverage                           |
-| `pnpm run test:e2e`      | End-to-end tests (Playwright)                      |
+| Script                    | What it does                                                 |
+| ------------------------- | ------------------------------------------------------------ |
+| `pnpm dev`                | Start the development server                                 |
+| `pnpm build`              | Production build                                             |
+| `pnpm preview`            | Serve the production build on the Workers runtime            |
+| `pnpm lint`               | ESLint + knip + type-check + Prettier + zizmor (in parallel) |
+| `pnpm fix`                | Auto-fix ESLint and Prettier issues                          |
+| `pnpm test`               | Unit tests (Vitest)                                          |
+| `pnpm run test:coverage`  | Unit tests with coverage                                     |
+| `pnpm run test:e2e`       | End-to-end tests (Playwright)                                |
+| `pnpm run deploy`         | Build and deploy the production Worker                       |
+| `pnpm run deploy:preview` | Build and deploy the `dreamvision-preview` Worker            |
 
 ### Testing notes
 
@@ -194,9 +196,21 @@ regardless of what was presented.
 
 ## Deployment
 
-- Push to `main` deploys to production (`wrangler deploy`).
-- Pull requests upload a preview version; the URL is posted as a sticky PR
-  comment. Fork PRs are skipped, since GitHub withholds the secret from them.
+Deployment is handled by `.github/workflows/deploy.yml`:
 
-Worker configuration lives in `wrangler.json`; the deployable config is
-generated under `dist/` by `@cloudflare/vite-plugin` during `pnpm build`.
+- Push to `main` deploys to production (`wrangler deploy`) through the `production` environment.
+- Pull requests upload a version to the separate `dreamvision-preview` Worker (`wrangler versions upload --env preview`) through the `preview` environment; that version's URL is posted as a sticky PR comment. Pull requests from forks are skipped, since GitHub does not expose the secret to them.
+
+Previews live on their own Worker because any token that can upload a version to a Worker can also deploy that version. Give each environment an environment-level `CLOUDFLARE_API_TOKEN` secret scoped to its own Worker (Cloudflare **Specified Workers**, **Editor** role), and give `production` a deployment branch rule that allows only `main`. Do not keep a repository-level `CLOUDFLARE_API_TOKEN`: an environment without its own secret falls back to it.
+
+A Worker-scoped token cannot create a Worker. Create the preview Worker once with any token that can, using `pnpm run deploy:preview`; the script keeps `-c wrangler.json`, because after a build wrangler otherwise follows the Vite plugin's redirect to `dist/wrangler.json`, ignores `--env preview` and deploys the production Worker. `env.preview` in `wrangler.json` empties `routes` and `triggers.crons` so that re-running it cannot move a custom domain or cron trigger onto the preview Worker; keep those overrides if either is ever added.
+
+The workflow runs as two jobs. `Build` produces `dist/` without the Cloudflare token in scope and uploads it as an artifact; `Deploy` restores it and is the only job the token reaches, behind a [bullfrog](https://github.com/bullfrogsec/bullfrog) egress allowlist. A step that needs a new host stalls until the host is added to that step's `allowed-domains`.
+
+`Deploy` deploys from `wrangler.json` (`-c wrangler.json`), not from the config `@cloudflare/vite-plugin` generates under `dist/`: that copy is kept out of the artifact, since a wrangler config can carry a `build.command` that wrangler executes.
+
+## CI pins and workflow security
+
+GitHub Actions are referenced by tag, and `.github/workflows/actions.lock` pins each one, transitive dependencies included, to a commit. Rerun `gh actions-lock` (the extension version CI installs) after adding a workflow or changing a `uses:`; CI runs `gh actions-lock --verify`, so a stale lockfile fails the Checks job. Renovate regenerates the lockfile when it bumps an action.
+
+CI audits the workflows with [zizmor](https://docs.zizmor.sh/), whose version is pinned in `mise.toml`; `pnpm lint` runs its offline audits.

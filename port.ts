@@ -1,5 +1,3 @@
-// `package.json`'s `tunnel` script carries the only other copy of this default,
-// because an npm script cannot import from here — move the two together.
 const DEFAULT_PORT = 5173;
 
 export const readPort = (
