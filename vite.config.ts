@@ -1,17 +1,13 @@
-import path from "node:path";
-
 import { cloudflare } from "@cloudflare/vite-plugin";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 
-import { localServerPort } from "./port";
+import { localServerPort } from "./port.ts";
 
 export default defineConfig({
   plugins: [react(), cloudflare()],
   resolve: {
-    alias: {
-      "@": path.resolve(import.meta.dirname, "./src"),
-    },
+    tsconfigPaths: true,
   },
   server: {
     port: localServerPort,

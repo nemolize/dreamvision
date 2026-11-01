@@ -12,7 +12,7 @@ const STORAGE_USAGE =
 
 /** One bind group per face the source buffer may be on, indexed by that
  * face — the pressure solve alone would otherwise build one per sweep. */
-export type FacePair = readonly [GPUBindGroup, GPUBindGroup];
+type FacePair = readonly [GPUBindGroup, GPUBindGroup];
 
 /** A pass reading two double buffers: the name says which face indexes first,
  * since both orders type-check and swapping them binds the wrong texture. */

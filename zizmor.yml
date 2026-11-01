@@ -1,0 +1,7 @@
+rules:
+  unpinned-uses:
+    config:
+      policies:
+        # actions.lock pins every action to a commit. zizmor 1.31 cannot read it
+        # (support starts at 1.32), so it would flag each tag reference as unpinned.
+        "*": ref-pin

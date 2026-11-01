@@ -24,7 +24,7 @@
     "allowUnreachableCode": false,
     "allowUnusedLabels": false,
     "erasableSyntaxOnly": true,
-    "types": ["vitest/globals", "@webgpu/types"],
+    "types": ["@webgpu/types"],
     "paths": {
       "@/*": ["./src/*"]
     }

@@ -8,7 +8,7 @@ export interface ResampleField {
   height: number;
 }
 
-export interface ResamplePair {
+interface ResamplePair {
   source: ResampleField;
   target: ResampleField;
 }

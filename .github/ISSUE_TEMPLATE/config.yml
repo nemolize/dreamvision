@@ -1,0 +1,4 @@
+# Blank issues are disabled so every issue arrives carrying its type label —
+# a blank one gets none, which is the taxonomy decay the forms exist to stop.
+# Repository maintainers still get a blank option in the chooser.
+blank_issues_enabled: false
