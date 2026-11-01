@@ -203,6 +203,8 @@ Deployment is handled by `.github/workflows/deploy.yml`:
 
 Previews live on their own Worker because any token that can upload a version to a Worker can also deploy that version. Give each environment an environment-level `CLOUDFLARE_API_TOKEN` secret scoped to its own Worker (Cloudflare **Specified Workers**, **Editor** role), and give `production` a deployment branch rule that allows only `main`. Do not keep a repository-level `CLOUDFLARE_API_TOKEN`: an environment without its own secret falls back to it.
 
+`pnpm run deploy` and `pnpm run deploy:preview` also work locally without `wrangler login`: export `CLOUDFLARE_API_TOKEN` with the token scoped to the Worker being deployed, for that one command.
+
 A Worker-scoped token cannot create a Worker. Create the preview Worker once with any token that can, using `pnpm run deploy:preview`; the script keeps `-c wrangler.json`, because after a build wrangler otherwise follows the Vite plugin's redirect to `dist/wrangler.json`, ignores `--env preview` and deploys the production Worker. `env.preview` in `wrangler.json` empties `routes` and `triggers.crons` so that re-running it cannot move a custom domain or cron trigger onto the preview Worker; keep those overrides if either is ever added.
 
 The workflow runs as two jobs. `Build` produces `dist/` without the Cloudflare token in scope and uploads it as an artifact; `Deploy` restores it and is the only job the token reaches, behind a [bullfrog](https://github.com/bullfrogsec/bullfrog) egress allowlist. A step that needs a new host stalls until the host is added to that step's `allowed-domains`.
