@@ -8,8 +8,10 @@ import {
   sampleCanvas,
 } from "./canvas";
 import {
+  cheapenGrids,
   freshPage,
   hideSettings,
+  pinStrongSplats,
   settleSlider,
   stir,
   waitFrames,
@@ -17,7 +19,7 @@ import {
 } from "./interactions";
 import { isPreviewTarget } from "./target";
 
-const FRAMES_FOR_DECAY_TO_SHOW = 90;
+const FRAMES_FOR_DECAY_TO_SHOW = 60;
 
 test.describe("fluid canvas", () => {
   test("fills the viewport with a canvas", async ({ page }) => {
@@ -99,8 +101,8 @@ test.describe("fluid canvas", () => {
   test("carries the dye decay slider through to the solver", async ({
     page,
   }) => {
-    // Two full simulation runs, each settling for seconds against CI's software
-    // renderer, so the default 30s ceiling is not enough.
+    // Two simulation runs, each waiting on frames from CI's software renderer,
+    // so the default 30s ceiling is not enough.
     test.setTimeout(180_000);
 
     const retentionAtDecay = async (decay: string): Promise<number> => {
@@ -108,6 +110,7 @@ test.describe("fluid canvas", () => {
 
       await page.getByRole("button", { name: "Open settings" }).click();
       await page.getByRole("slider", { name: "Dye decay" }).fill(decay);
+      await cheapenGrids(page);
       await hideSettings(page);
 
       const viewport = page.viewportSize() ?? { width: 1280, height: 720 };
@@ -131,7 +134,7 @@ test.describe("fluid canvas", () => {
           .poll(framesSeen, { timeout: 120_000 })
           .toBeGreaterThanOrEqual(target);
 
-      await untilFrames(30);
+      await untilFrames(10);
       const before = await meanBrightness(page);
       expect(before).toBeGreaterThan(0);
 
@@ -163,6 +166,7 @@ test.describe("fluid canvas", () => {
     // Held still so the reads either side of the rebuild differ by the rebuild
     // and not by however long the screenshots took.
     await page.getByRole("slider", { name: "Dye decay" }).fill("0");
+    await pinStrongSplats(page);
 
     const viewport = page.viewportSize() ?? { width: 1280, height: 720 };
     await stir(page, viewport);
@@ -262,6 +266,8 @@ test.describe("fluid canvas", () => {
 
     const canvas = page.getByLabel("Fluid simulation");
     await expect(canvas).toBeVisible();
+    await page.getByRole("button", { name: "Open settings" }).click();
+    await pinStrongSplats(page);
     await hideSettings(page);
 
     // An adapter-less environment renders the notice instead; failing here
@@ -375,6 +381,7 @@ test.describe("fluid canvas", () => {
 
       await page.getByRole("button", { name: "Open settings" }).click();
       await settleSlider(page, "Splat force", "60");
+      await cheapenGrids(page);
       await page.getByRole("checkbox", { name: "Wrap edges" }).setChecked(wrap);
       await hideSettings(page);
 

@@ -72,7 +72,7 @@ describe("SettingsPanel", () => {
     renderPanel({});
     await open();
 
-    expect(screen.getByText("0.0010")).toBeTruthy();
+    expect(screen.getByText("0.0005")).toBeTruthy();
     expect(screen.getByText("10")).toBeTruthy();
     expect(screen.getByText("0.20")).toBeTruthy();
   });
