@@ -44,7 +44,7 @@
     "@vitest/coverage-v8": "^5.0.0",
     "@vitest/eslint-plugin": "^1.6.26",
     "@webgpu/types": "^0.1.66",
-    "eslint": "10.10.0",
+    "eslint": "10.13.0",
     "eslint-plugin-jsx-a11y-x": "^0.2.0",
     "eslint-plugin-playwright": "^2.11.0",
     "eslint-plugin-react-hooks": "^7.1.1",
