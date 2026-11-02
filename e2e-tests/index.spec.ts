@@ -335,6 +335,13 @@ test.describe("fluid canvas", () => {
       release: () => Promise<void>,
     ): Promise<number> => {
       await freshPage(page, "/?seed=off");
+
+      await page.getByRole("button", { name: "Open settings" }).click();
+      // Pinned so the revoked field fades clearly yet stays above zero, and the
+      // stroke is one the reads can see, whatever the defaults are.
+      await page.getByRole("slider", { name: "Dye decay" }).fill("1");
+      await pinStrongSplats(page);
+      await cheapenGrids(page);
       await hideSettings(page);
 
       await page.mouse.move(...at({ x: 0.3, y: abandoned.y }));
@@ -345,12 +352,10 @@ test.describe("fluid canvas", () => {
 
       // Settled first because the dye already painted keeps advecting for a
       // while, and that motion is not what this test is about.
-      /* eslint-disable playwright/no-wait-for-timeout */
-      await page.waitForTimeout(3000);
+      await waitFrames(page, 20);
       const before = await sampleCanvas(page);
 
-      await page.waitForTimeout(4000);
-      /* eslint-enable playwright/no-wait-for-timeout */
+      await waitFrames(page, 40);
       const after = await sampleCanvas(page);
 
       // Asserted before the ratio because every degenerate reading divides out to
