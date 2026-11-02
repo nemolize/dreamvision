@@ -82,39 +82,36 @@ jobs:
       url: ${{ steps.deploy.outputs.deployment-url }}
 
     steps:
-      # First, so no later step reaches a host outside this list.
+      # Before the filter, which needs its output; GitHub adds storage hosts over time.
+      - name: List the artifact storage hosts GitHub publishes
+        id: blob-hosts
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          hosts="$(gh api meta --jq '.domains.actions[] | select(test("^productionresultssa[0-9]+\\.blob\\.core\\.windows\\.net$"))')"
+          if [ -z "${hosts}" ]; then
+            echo "::error::the meta API listed no productionresultssa hosts"
+            exit 1
+          fi
+          {
+            echo "hosts<<EOF"
+            echo "${hosts}"
+            echo "EOF"
+          } >> "${GITHUB_OUTPUT}"
+
+      # Right after, so no later step reaches a host outside this list.
       - uses: bullfrogsec/bullfrog@v0.11.1
         with:
           egress-policy: block
           # Raw-IP packets bypass the filter, and sudo is what can send them.
           enable-sudo: false
-          # Artifact storage, as GitHub's Copilot allowlist reference lists it;
-          # *.blob.core.windows.net would admit any Azure storage account.
+          # Storage hosts come from the meta API: *.blob.core.windows.net admits any Azure account.
           # release-assets.githubusercontent.com: where setup-node's Node download redirects.
           allowed-domains: |
             github.com
             api.github.com
             *.actions.githubusercontent.com
-            productionresultssa0.blob.core.windows.net
-            productionresultssa1.blob.core.windows.net
-            productionresultssa2.blob.core.windows.net
-            productionresultssa3.blob.core.windows.net
-            productionresultssa4.blob.core.windows.net
-            productionresultssa5.blob.core.windows.net
-            productionresultssa6.blob.core.windows.net
-            productionresultssa7.blob.core.windows.net
-            productionresultssa8.blob.core.windows.net
-            productionresultssa9.blob.core.windows.net
-            productionresultssa10.blob.core.windows.net
-            productionresultssa11.blob.core.windows.net
-            productionresultssa12.blob.core.windows.net
-            productionresultssa13.blob.core.windows.net
-            productionresultssa14.blob.core.windows.net
-            productionresultssa15.blob.core.windows.net
-            productionresultssa16.blob.core.windows.net
-            productionresultssa17.blob.core.windows.net
-            productionresultssa18.blob.core.windows.net
-            productionresultssa19.blob.core.windows.net
+            ${{ steps.blob-hosts.outputs.hosts }}
             registry.npmjs.org
             api.cloudflare.com
             release-assets.githubusercontent.com
