@@ -72,8 +72,8 @@ describe("SettingsPanel", () => {
     renderPanel({});
     await open();
 
-    expect(screen.getByText("0.0035")).toBeTruthy();
-    expect(screen.getByText("30")).toBeTruthy();
+    expect(screen.getByText("0.0005")).toBeTruthy();
+    expect(screen.getByText("10")).toBeTruthy();
     expect(screen.getByText("0.20")).toBeTruthy();
   });
 
@@ -83,7 +83,9 @@ describe("SettingsPanel", () => {
     await open();
 
     const force = screen.getByRole("slider", { name: "Splat force" });
-    fireEvent.change(force, { target: { value: "31" } });
+    fireEvent.change(force, {
+      target: { value: String(DEFAULT_SETTINGS.splatForce + 1) },
+    });
 
     const reported = lastReported(onChange);
     // The whole object, not just the moved key: the parent replaces its state
