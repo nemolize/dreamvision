@@ -374,6 +374,7 @@ test.describe("fluid canvas", () => {
       await freshPage(page, "/?seed=off");
 
       await page.getByRole("button", { name: "Open settings" }).click();
+      await settleSlider(page, "Splat force", "60");
       await page.getByRole("checkbox", { name: "Wrap edges" }).setChecked(wrap);
       await hideSettings(page);
 

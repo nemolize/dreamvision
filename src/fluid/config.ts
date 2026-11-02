@@ -22,11 +22,11 @@ export const VELOCITY_DISSIPATION = 0.2;
 export const DYE_DISSIPATION = 0.6;
 
 /** Divides squared distance in `exp(-d² / r)`, so it is a squared length, not
- * a radius — 0.0035 puts the splat's e-folding edge ~6% across the screen. */
-export const SPLAT_RADIUS = 0.0035;
+ * a radius. */
+export const SPLAT_RADIUS = 0.001;
 
 /** Scales normalised pointer motion into the velocity written to the field. */
-export const SPLAT_FORCE = 30;
+export const SPLAT_FORCE = 10;
 
 /** Bounds the uniform buffer the splat pass indexes into, so anything beyond
  * it is dropped rather than read out of range. */
