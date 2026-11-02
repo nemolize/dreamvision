@@ -17,16 +17,16 @@ export const REFERENCE_STEP = 1 / 60;
 export const MAX_FRAME_SECONDS = 1 / 30;
 
 /** Applied as `1 / (1 + rate * dt)` per frame, so not survival ratios: 0.2 leaves
- * ~82% of the velocity after a second, 0.6 leaves ~55% of the dye. */
+ * ~82% after a second and 1 leaves ~37%. */
 export const VELOCITY_DISSIPATION = 0.2;
-export const DYE_DISSIPATION = 0.6;
+export const DYE_DISSIPATION = 0.1;
 
 /** Divides squared distance in `exp(-d² / r)`, so it is a squared length, not
- * a radius — 0.0035 puts the splat's e-folding edge ~6% across the screen. */
-export const SPLAT_RADIUS = 0.0035;
+ * a radius. */
+export const SPLAT_RADIUS = 0.0005;
 
 /** Scales normalised pointer motion into the velocity written to the field. */
-export const SPLAT_FORCE = 30;
+export const SPLAT_FORCE = 10;
 
 /** Bounds the uniform buffer the splat pass indexes into, so anything beyond
  * it is dropped rather than read out of range. */
