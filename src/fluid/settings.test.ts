@@ -76,11 +76,29 @@ describe("normaliseSettings", () => {
 describe("SETTING_DESCRIPTORS", () => {
   it("gives every setting a descriptor whose range holds its default", () => {
     const described = SETTING_DESCRIPTORS.map((descriptor) => descriptor.key);
-    expect([...described].sort()).toEqual(Object.keys(DEFAULT_SETTINGS).sort());
+    const { wrapEdges: _toggle, ...numeric } = DEFAULT_SETTINGS;
+    expect([...described].sort()).toEqual(Object.keys(numeric).sort());
 
     for (const { key, min, max } of SETTING_DESCRIPTORS) {
       expect(DEFAULT_SETTINGS[key]).toBeGreaterThanOrEqual(min);
       expect(DEFAULT_SETTINGS[key]).toBeLessThanOrEqual(max);
     }
+  });
+});
+
+describe("wrapEdges", () => {
+  it("defaults to walls", () => {
+    expect(DEFAULT_SETTINGS.wrapEdges).toBe(false);
+    expect(normaliseSettings({}).wrapEdges).toBe(false);
+  });
+
+  it("keeps a stored boolean", () => {
+    expect(normaliseSettings({ wrapEdges: true }).wrapEdges).toBe(true);
+    expect(normaliseSettings({ wrapEdges: false }).wrapEdges).toBe(false);
+  });
+
+  it("falls back to the default for a stored value that is not a boolean", () => {
+    expect(normaliseSettings({ wrapEdges: 1 }).wrapEdges).toBe(false);
+    expect(normaliseSettings({ wrapEdges: "true" }).wrapEdges).toBe(false);
   });
 });

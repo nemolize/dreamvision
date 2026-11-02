@@ -10,7 +10,7 @@ import { describeSettings } from "./descriptor";
 
 /** Only constants that take effect on the next frame. Grid sizes cannot, so
  * they travel on their own channel — see `ResolutionSettings`. */
-export interface FluidSettings {
+export interface NumericSettings {
   velocityDissipation: number;
   dyeDissipation: number;
   splatRadius: number;
@@ -18,7 +18,11 @@ export interface FluidSettings {
   pressureIterations: number;
 }
 
-export const DEFAULT_SETTINGS: FluidSettings = {
+export interface FluidSettings extends NumericSettings {
+  wrapEdges: boolean;
+}
+
+const NUMERIC_DEFAULTS: NumericSettings = {
   velocityDissipation: VELOCITY_DISSIPATION,
   dyeDissipation: DYE_DISSIPATION,
   splatRadius: SPLAT_RADIUS,
@@ -26,8 +30,13 @@ export const DEFAULT_SETTINGS: FluidSettings = {
   pressureIterations: PRESSURE_ITERATIONS,
 };
 
+export const DEFAULT_SETTINGS: FluidSettings = {
+  ...NUMERIC_DEFAULTS,
+  wrapEdges: false,
+};
+
 export const SETTING_DESCRIPTORS: readonly SettingDescriptor<
-  keyof FluidSettings
+  keyof NumericSettings
 >[] = [
   {
     key: "velocityDissipation",
@@ -71,9 +80,18 @@ export const SETTING_DESCRIPTORS: readonly SettingDescriptor<
   },
 ];
 
-const settings = describeSettings(SETTING_DESCRIPTORS, DEFAULT_SETTINGS);
+const settings = describeSettings(SETTING_DESCRIPTORS, NUMERIC_DEFAULTS);
 
 export const clampSetting = settings.clamp;
 
-export const normaliseSettings = (input: unknown): FluidSettings =>
-  settings.normalise(input);
+export const normaliseSettings = (input: unknown): FluidSettings => {
+  const wrapEdges =
+    typeof input === "object" && input !== null && "wrapEdges" in input
+      ? input.wrapEdges
+      : undefined;
+  return {
+    ...settings.normalise(input),
+    wrapEdges:
+      typeof wrapEdges === "boolean" ? wrapEdges : DEFAULT_SETTINGS.wrapEdges,
+  };
+};

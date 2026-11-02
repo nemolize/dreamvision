@@ -12,6 +12,7 @@ import {
   hideSettings,
   settleSlider,
   stir,
+  waitFrames,
   whileHidden,
 } from "./interactions";
 import { isPreviewTarget } from "./target";
@@ -362,6 +363,44 @@ test.describe("fluid canvas", () => {
     // A stranded stroke keeps splatting, so its field decays less; compared with
     // it because the decay depends on the frame rate. 0.8 is chosen empirically.
     expect(revoked).toBeLessThan(stranded * 0.8);
+  });
+
+  test("lets dye cross an edge only when the edges are wrapped", async ({
+    page,
+  }) => {
+    test.setTimeout(180_000);
+
+    const leftEdgeBrightness = async (wrap: boolean): Promise<number> => {
+      await freshPage(page, "/?seed=off");
+
+      await page.getByRole("button", { name: "Open settings" }).click();
+      await page.getByRole("checkbox", { name: "Wrap edges" }).setChecked(wrap);
+      await hideSettings(page);
+
+      const viewport = page.viewportSize() ?? { width: 1280, height: 720 };
+      const midY = viewport.height / 2;
+      // Ends far enough from the edge that the splat itself, wrapped, reaches
+      // nothing on the far side: only the flow can carry dye across.
+      await page.mouse.move(viewport.width * 0.5, midY);
+      await page.mouse.down();
+      for (let pass = 1; pass <= 4; pass++) {
+        await page.mouse.move(viewport.width * (0.5 + 0.0875 * pass), midY, {
+          steps: 6,
+        });
+        await waitFrames(page, 1);
+      }
+      await page.mouse.up();
+
+      await waitFrames(page, 60);
+      return meanAround(await sampleCanvas(page), { x: 0.03, y: 0.5 }, 0.06);
+    };
+
+    const walled = await leftEdgeBrightness(false);
+    const wrapped = await leftEdgeBrightness(true);
+
+    // 10 is chosen empirically, no fixed source.
+    expect(walled).toBeLessThan(1);
+    expect(wrapped).toBeGreaterThan(10);
   });
 
   test("paints the seed burst before any input", async ({ page }) => {

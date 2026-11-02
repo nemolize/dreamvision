@@ -94,6 +94,12 @@ canvas {
   cursor: pointer;
 }
 
+.settings__row input[type="checkbox"] {
+  grid-area: value;
+  accent-color: #8ab4f8;
+  cursor: pointer;
+}
+
 .settings__value {
   grid-area: value;
   font-variant-numeric: tabular-nums;

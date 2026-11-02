@@ -69,3 +69,20 @@ export const settleSlider = async (
   await slider.fill(value);
   await slider.blur();
 };
+
+/** Counted in frames because each one advances the simulation by a capped step,
+ * so wall time says little about how far the flow has travelled. */
+export const waitFrames = (page: Page, count: number): Promise<void> =>
+  page.evaluate(
+    (total) =>
+      new Promise<void>((resolve) => {
+        let seen = 0;
+        const tick = () => {
+          seen++;
+          if (seen >= total) resolve();
+          else requestAnimationFrame(tick);
+        };
+        requestAnimationFrame(tick);
+      }),
+    count,
+  );

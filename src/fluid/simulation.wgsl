@@ -21,14 +21,22 @@ struct Uniforms {
   // across the solve and the Jacobi sweep needs no weights of its own.
   toCells: vec2f,
   toStored: vec2f,
+  wrapEdges: f32,      // 1 joins opposite edges, 0 leaves them as walls
+  _pad0: f32,
+  _pad1: f32,
+  _pad2: f32,
 }
 
 @group(0) @binding(0) var<uniform> u: Uniforms;
 
-/// Read one texel, clamping to the edge so out-of-range reads mirror the
-/// wall's value rather than wrapping to the far side of the grid.
+/// Read one texel. Out-of-range reads clamp to the edge, mirroring the wall's
+/// value, unless the edges are joined, where they wrap to the far side.
 fn loadAt(tex: texture_2d<f32>, size: vec2f, cell: vec2i) -> vec4f {
-  let bounded = clamp(cell, vec2i(0, 0), vec2i(size) - vec2i(1, 1));
+  let extent = vec2i(size);
+  var bounded = clamp(cell, vec2i(0, 0), extent - vec2i(1, 1));
+  if (u.wrapEdges > 0.5) {
+    bounded = ((cell % extent) + extent) % extent;
+  }
   return textureLoad(tex, bounded, 0);
 }
 
@@ -51,6 +59,7 @@ fn sampleAt(tex: texture_2d<f32>, size: vec2f, cell: vec2f) -> vec4f {
 /// dropped while the tangential one slides along untouched. Negating the normal
 /// component instead would keep its magnitude and merely reverse the leak.
 fn applyVelocityBoundary(velocity: vec2f, id: vec2u, size: vec2u) -> vec2f {
+  if (u.wrapEdges > 0.5) { return velocity; }
   var bounded = velocity;
   if (id.x == 0u || id.x == size.x - 1u) { bounded.x = 0.0; }
   if (id.y == 0u || id.y == size.y - 1u) { bounded.y = 0.0; }
@@ -110,10 +119,11 @@ fn divergence(@builtin(global_invocation_id) gid: vec3u) {
   // At a wall the outside sample is a clamped copy of the centre cell, which
   // would read as a non-zero normal flow; mirror it instead.
   let centre = sampleAt(divergenceVelocity, u.simSize, cell).xy;
-  if (gid.x == 0u) { left = -centre.x; }
-  if (gid.x == size.x - 1u) { right = -centre.x; }
-  if (gid.y == 0u) { down = -centre.y; }
-  if (gid.y == size.y - 1u) { up = -centre.y; }
+  let walled = u.wrapEdges < 0.5;
+  if (walled && gid.x == 0u) { left = -centre.x; }
+  if (walled && gid.x == size.x - 1u) { right = -centre.x; }
+  if (walled && gid.y == 0u) { down = -centre.y; }
+  if (walled && gid.y == size.y - 1u) { up = -centre.y; }
 
   let divergenceValue =
     0.5 * u.toCells.x * (right - left) + 0.5 * u.toCells.y * (up - down);
@@ -233,6 +243,8 @@ fn splat(@builtin(global_invocation_id) gid: vec3u) {
   // Distance in normalised space, x stretched by the aspect ratio so the blob
   // stays circular on screen rather than following the grid's proportions.
   var offset = (vec2f(gid.xy) + 0.5) / splatParams.gridSize - s.point;
+  // Joined edges put a blob's copy a full screen away, so take the near one.
+  if (u.wrapEdges > 0.5) { offset -= round(offset); }
   offset.x *= u.aspect;
   let falloff = exp(-dot(offset, offset) / s.radius);
 

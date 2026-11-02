@@ -164,6 +164,7 @@ export const createFluidRenderer = (
       current.dyeGrid,
       current.scale,
       dt,
+      settings.wrapEdges,
     );
     device.queue.writeBuffer(uniformBuffer, 0, uniformData);
 

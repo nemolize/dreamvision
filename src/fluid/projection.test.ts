@@ -53,7 +53,7 @@ const velocity = (width: number, height: number): Velocity => ({
  * cell metric, with the outside sample mirrored at a wall so no flow crosses
  * it.
  */
-const divergence = (u: Velocity): Field => {
+const divergence = (u: Velocity, wrap = false): Field => {
   const { width, height } = u.x;
   const scale = projectionScale(width, height);
   const out = field(width, height);
@@ -63,10 +63,29 @@ const divergence = (u: Velocity): Field => {
       const centreX = at(u.x, x, y);
       const centreY = at(u.y, x, y);
 
-      const left = x === 0 ? -centreX : at(u.x, x - 1, y);
-      const right = x === width - 1 ? -centreX : at(u.x, x + 1, y);
-      const down = y === 0 ? -centreY : at(u.y, x, y - 1);
-      const up = y === height - 1 ? -centreY : at(u.y, x, y + 1);
+      const wrapped = (f: Field, dx: number, dy: number): number =>
+        at(f, (x + dx + width) % width, (y + dy + height) % height);
+
+      const left = wrap
+        ? wrapped(u.x, -1, 0)
+        : x === 0
+          ? -centreX
+          : at(u.x, x - 1, y);
+      const right = wrap
+        ? wrapped(u.x, 1, 0)
+        : x === width - 1
+          ? -centreX
+          : at(u.x, x + 1, y);
+      const down = wrap
+        ? wrapped(u.y, 0, -1)
+        : y === 0
+          ? -centreY
+          : at(u.y, x, y - 1);
+      const up = wrap
+        ? wrapped(u.y, 0, 1)
+        : y === height - 1
+          ? -centreY
+          : at(u.y, x, y + 1);
 
       set(
         out,
@@ -518,5 +537,27 @@ describe("the projection as a whole", () => {
     // The residual floor is the deferred stencil mismatch, not the metric:
     // weighting both directions alike leaves ~2.2% here against ~0.9%.
     expect(Math.sqrt(remaining / original)).toBeLessThan(0.015);
+  });
+});
+
+describe("divergence with joined edges", () => {
+  const uniformFlow = (): Velocity => {
+    const u = velocity(8, 6);
+    fillVelocity(
+      u,
+      () => 1,
+      () => -2,
+    );
+    return u;
+  };
+
+  it("sees a uniform flow as divergence-free at every cell, edges included", () => {
+    const out = divergence(uniformFlow(), true);
+    for (const value of out.data) expect(value).toBeCloseTo(0, 12);
+  });
+
+  it("still sees that flow pushing into a wall at the edges when they are walls", () => {
+    const out = divergence(uniformFlow(), false);
+    expect(out.data.some((value) => Math.abs(value) > 1e-6)).toBe(true);
   });
 });

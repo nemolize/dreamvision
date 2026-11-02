@@ -109,6 +109,19 @@ describe("SettingsPanel", () => {
     expect(lastReported(onChange).splatForce).toBe(100);
   });
 
+  it("reports the wrap toggle as a whole settings object", async () => {
+    const onChange = changeSpy();
+    renderPanel({ onChange });
+    await open();
+
+    await userEvent.click(screen.getByRole("checkbox", { name: "Wrap edges" }));
+
+    expect(lastReported(onChange)).toEqual({
+      ...DEFAULT_SETTINGS,
+      wrapEdges: true,
+    });
+  });
+
   it("hands the reset decision to its parent", async () => {
     const onReset = vi.fn();
     const onChange = changeSpy();
