@@ -60,11 +60,12 @@ first frame is already in motion — the burst is skipped entirely under
 accumulating over a drag's frames, so it is injected brighter to compensate
 (`SEED_DYE_GAIN`).
 
-The solver advances by a fixed timestep while the frame loop accumulates real
-elapsed time, so the fluid behaves the same on a 60Hz and a 120Hz display. A
-gap longer than one frame's budget — a hidden tab, a slept machine — is capped
-at that budget rather than banked, so returning to the tab resumes from the
-present instead of fast-forwarding through the gap. If the GPU device is lost, the
+Every frame advances the solver by its own elapsed time, so a 120Hz display
+takes half-length steps and the fluid moves at the same speed as on a 60Hz one.
+The pointer's dye is scaled by the same ratio, so it does not pile up faster on
+a faster display. A frame is capped at 1/30 s: below 30 fps, or after a hidden
+tab or a slept machine, the fluid runs slower than real time rather than taking
+one huge step or fast-forwarding through the gap. If the GPU device is lost, the
 canvas is replaced by a notice instead of freezing in place.
 
 Two grids are in play: velocity and pressure run on a coarse grid, dye on a

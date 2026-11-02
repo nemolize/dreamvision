@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { MAX_STEPS_PER_FRAME, TIME_STEP } from "./config";
+import { MAX_FRAME_SECONDS } from "./config";
 import { creditedElapsed, MotionGate, reducedMotionQuery } from "./motion";
 
 const media = (matches: boolean) => vi.fn((_query: string) => ({ matches }));
@@ -25,23 +25,23 @@ describe("reducedMotionQuery", () => {
 });
 
 describe("creditedElapsed", () => {
-  const budget = MAX_STEPS_PER_FRAME * TIME_STEP;
+  const budget = MAX_FRAME_SECONDS;
 
   it("passes an ordinary frame through untouched", () => {
     expect(creditedElapsed(1 / 60)).toBeCloseTo(1 / 60, 6);
     expect(creditedElapsed(1 / 120)).toBeCloseTo(1 / 120, 6);
   });
 
-  it("caps a gap at what one frame can drain, so none of it banks", () => {
+  it("caps a gap at the frame ceiling, so a stall is not replayed in one leap", () => {
     // The case the hidden-tab path produces: visibilitychange reopens the gate
     // before the first resumed frame, so this gap arrives with the gate open.
     expect(creditedElapsed(60)).toBeCloseTo(budget, 6);
     expect(creditedElapsed(2)).toBeCloseTo(budget, 6);
   });
 
-  it("floors a backwards frame, so no step is banked from nothing", () => {
+  it("floors a backwards frame, so no time is credited from nothing", () => {
     // Because Chromium was measured giving the first rAF callback a timestamp
-    // 4.3ms before its own performance.now(); unfloored that banks a step.
+    // 4.3ms before its own performance.now(); unfloored that credits a negative step.
     expect(creditedElapsed(-4.3 / 1000)).toBe(0);
   });
 

@@ -8,19 +8,16 @@ export const DYE_RESOLUTION = 1024;
 /** Jacobi sweeps per frame for the pressure projection. */
 export const PRESSURE_ITERATIONS = 32;
 
-/** Fixed timestep the solver always advances by. The frame loop accumulates
- * real elapsed time and runs whole steps, so a 120Hz display runs the same
- * simulation as a 60Hz one rather than twice as fast. */
-export const TIME_STEP = 1 / 60;
+/** One 60Hz frame: the length the pointer's dye is calibrated at. A frame of
+ * length `dt` adds `dt / REFERENCE_STEP` times as much, so refresh rate cancels. */
+export const REFERENCE_STEP = 1 / 60;
 
-/** Ceiling on steps per frame. After a background tab or a long stall the
- * accumulated time can span seconds; without this the catch-up loop would
- * freeze the page trying to replay all of it. */
-export const MAX_STEPS_PER_FRAME = 4;
+/** A 30 fps floor: below it the simulation slows rather than take one step so
+ * large that the dye leaves the screen in a single frame. */
+export const MAX_FRAME_SECONDS = 1 / 30;
 
-/** Decay rates, applied as `1 / (1 + rate * dt)` per step — so these are not
- * survival ratios: 0.2 leaves ~82% of the velocity after a second, 0.6 leaves
- * ~55% of the dye. Dye fades faster so the screen does not saturate. */
+/** Applied as `1 / (1 + rate * dt)` per frame, so not survival ratios: 0.2 leaves
+ * ~82% of the velocity after a second, 0.6 leaves ~55% of the dye. */
 export const VELOCITY_DISSIPATION = 0.2;
 export const DYE_DISSIPATION = 0.6;
 

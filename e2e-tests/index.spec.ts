@@ -284,10 +284,6 @@ test.describe("fluid canvas", () => {
     // against CI's software renderer — the default 30s ceiling is not enough.
     test.setTimeout(180_000);
 
-    await freshPage(page, "/?seed=off");
-
-    await hideSettings(page);
-
     const viewport = page.viewportSize() ?? { width: 1280, height: 720 };
     // Abandoned mid-canvas, away from the edges, because the disc sampled around
     // it has to stay on the canvas in every direction.
@@ -296,50 +292,60 @@ test.describe("fluid canvas", () => {
       viewport.width * point.x,
       viewport.height * point.y,
     ];
-
-    await page.mouse.move(...at({ x: 0.3, y: abandoned.y }));
-    await page.mouse.down();
-    await page.mouse.move(...at(abandoned), { steps: 6 });
+    const sum = (pixels: number[]): number =>
+      pixels.reduce((total, value) => total + value, 0);
 
     // Dispatched by hand because Playwright's mouse cannot revoke a capture; the
     // id must be its own 1, since PointerEvent's default 0 matches no stroke.
-    await page.evaluate(() => {
-      document.querySelector("canvas")?.dispatchEvent(
-        new PointerEvent("lostpointercapture", {
-          bubbles: true,
-          pointerId: 1,
-        }),
-      );
-    });
+    const revokeCapture = (): Promise<void> =>
+      page.evaluate(() => {
+        document.querySelector("canvas")?.dispatchEvent(
+          new PointerEvent("lostpointercapture", {
+            bubbles: true,
+            pointerId: 1,
+          }),
+        );
+      });
+    const holdStroke = (): Promise<void> => Promise.resolve();
 
-    // Settled first because the dye already painted keeps advecting for a
-    // while, and that motion is not what this test is about.
-    /* eslint-disable playwright/no-wait-for-timeout */
-    await page.waitForTimeout(3000);
-    const before = await sampleCanvas(page);
+    const fieldGrowth = async (
+      release: () => Promise<void>,
+    ): Promise<number> => {
+      await freshPage(page, "/?seed=off");
+      await hideSettings(page);
 
-    await page.waitForTimeout(4000);
-    /* eslint-enable playwright/no-wait-for-timeout */
-    const after = await sampleCanvas(page);
+      await page.mouse.move(...at({ x: 0.3, y: abandoned.y }));
+      await page.mouse.down();
+      await page.mouse.move(...at(abandoned), { steps: 6 });
 
-    const sum = (pixels: number[]): number =>
-      pixels.reduce((total, value) => total + value, 0);
-    const localBefore = meanAround(before, abandoned, 0.06);
+      await release();
 
-    // Asserted before the ratio because every degenerate reading divides out to
-    // 1 and passes: an unpainted drag would otherwise verify nothing at all.
-    expect(localBefore).toBeGreaterThan(0);
-    expect(sum(before)).toBeGreaterThan(0);
+      // Settled first because the dye already painted keeps advecting for a
+      // while, and that motion is not what this test is about.
+      /* eslint-disable playwright/no-wait-for-timeout */
+      await page.waitForTimeout(3000);
+      const before = await sampleCanvas(page);
 
-    const localAfter = meanAround(after, abandoned, 0.06);
-    expect(localAfter).toBeGreaterThan(0);
+      await page.waitForTimeout(4000);
+      /* eslint-enable playwright/no-wait-for-timeout */
+      const after = await sampleCanvas(page);
 
-    // The field's sum fell to 0.53-0.59 when the stroke ended and only to 0.87-0.93
-    // when it stayed stranded (12 local runs); 0.75 is chosen empirically between.
-    const fieldGrowth = sum(after) / sum(before);
-    expect(fieldGrowth).toBeLessThan(0.75);
+      // Asserted before the ratio because every degenerate reading divides out to
+      // 1 and passes: an unpainted drag would otherwise verify nothing at all.
+      expect(meanAround(before, abandoned, 0.06)).toBeGreaterThan(0);
+      expect(sum(before)).toBeGreaterThan(0);
+      expect(meanAround(after, abandoned, 0.06)).toBeGreaterThan(0);
 
-    await page.mouse.up();
+      await page.mouse.up();
+      return sum(after) / sum(before);
+    };
+
+    const revoked = await fieldGrowth(revokeCapture);
+    const stranded = await fieldGrowth(holdStroke);
+
+    // A stranded stroke keeps splatting, so its field decays less; compared with
+    // it because the decay depends on the frame rate. 0.8 is chosen empirically.
+    expect(revoked).toBeLessThan(stranded * 0.8);
   });
 
   test("paints the seed burst before any input", async ({ page }) => {
