@@ -16,6 +16,8 @@ import {
 } from "./interactions";
 import { isPreviewTarget } from "./target";
 
+const FRAMES_FOR_DECAY_TO_SHOW = 90;
+
 test.describe("fluid canvas", () => {
   test("fills the viewport with a canvas", async ({ page }) => {
     await page.goto("/");
@@ -110,15 +112,29 @@ test.describe("fluid canvas", () => {
       const viewport = page.viewportSize() ?? { width: 1280, height: 720 };
       await stir(page, viewport);
 
-      // Elapsed time is the variable under test — decay is a rate — so these
-      // wait for a fixed span rather than for a condition to become true.
-      /* eslint-disable playwright/no-wait-for-timeout */
-      await page.waitForTimeout(1000);
+      // Each frame advances the simulation by at most 1/30 s, so wall time says
+      // nothing about how much the dye has decayed on a slow renderer; frames do.
+      await page.evaluate(() => {
+        let frames = 0;
+        const count = () => {
+          frames++;
+          document.body.dataset["frames"] = String(frames);
+          requestAnimationFrame(count);
+        };
+        requestAnimationFrame(count);
+      });
+      const framesSeen = (): Promise<number> =>
+        page.evaluate(() => Number(document.body.dataset["frames"] ?? 0));
+      const untilFrames = (target: number): Promise<void> =>
+        expect
+          .poll(framesSeen, { timeout: 120_000 })
+          .toBeGreaterThanOrEqual(target);
+
+      await untilFrames(30);
       const before = await meanBrightness(page);
       expect(before).toBeGreaterThan(0);
 
-      await page.waitForTimeout(4000);
-      /* eslint-enable playwright/no-wait-for-timeout */
+      await untilFrames((await framesSeen()) + FRAMES_FOR_DECAY_TO_SHOW);
       const after = await meanBrightness(page);
       expect(after).toBeGreaterThanOrEqual(0);
       return after / before;
