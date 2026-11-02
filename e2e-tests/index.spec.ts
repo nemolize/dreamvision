@@ -110,6 +110,17 @@ test.describe("fluid canvas", () => {
       const viewport = page.viewportSize() ?? { width: 1280, height: 720 };
       await stir(page, viewport);
 
+      await page.evaluate(() => {
+        let frames = 0;
+        const count = () => {
+          frames++;
+          document.body.dataset["frames"] = String(frames);
+          requestAnimationFrame(count);
+        };
+        requestAnimationFrame(count);
+      });
+      const probeStart = Date.now();
+
       // Elapsed time is the variable under test — decay is a rate — so these
       // wait for a fixed span rather than for a condition to become true.
       /* eslint-disable playwright/no-wait-for-timeout */
@@ -120,6 +131,12 @@ test.describe("fluid canvas", () => {
       await page.waitForTimeout(4000);
       /* eslint-enable playwright/no-wait-for-timeout */
       const after = await meanBrightness(page);
+      const probeFrames = await page.evaluate(
+        () => document.body.dataset["frames"],
+      );
+      console.log(
+        `PROBE decay=${decay} frames=${String(probeFrames)} wall=${String(Date.now() - probeStart)}ms before=${String(before)} after=${String(after)}`,
+      );
       expect(after).toBeGreaterThanOrEqual(0);
       return after / before;
     };
