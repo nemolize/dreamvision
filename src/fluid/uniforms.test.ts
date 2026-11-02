@@ -94,7 +94,7 @@ describe("UNIFORM", () => {
 });
 
 describe("packUniforms", () => {
-  const pack = (): Float32Array => {
+  const pack = (wrapEdges = false): Float32Array => {
     const target = new Float32Array(UNIFORM_FLOATS);
     packUniforms(
       target,
@@ -102,9 +102,15 @@ describe("packUniforms", () => {
       { width: 200, height: 100 },
       projectionScale(64, 32),
       1 / 60,
+      wrapEdges,
     );
     return target;
   };
+
+  it("writes the wrap flag as 1 when edges join and 0 when they are walls", () => {
+    expect(pack(true)[UNIFORM.wrapEdges]).toBe(1);
+    expect(pack(false)[UNIFORM.wrapEdges]).toBe(0);
+  });
 
   it("writes the simulation grid, not the dye grid, into simSize", () => {
     const packed = pack();
@@ -140,6 +146,7 @@ describe("packUniforms", () => {
       { width: 8, height: 8 },
       projectionScale(8, 8),
       1,
+      true,
     );
     for (const offset of Object.values(UNIFORM)) {
       expect(target[offset]).not.toBeNaN();

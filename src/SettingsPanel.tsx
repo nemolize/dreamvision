@@ -41,6 +41,25 @@ const SliderRow = ({
   </label>
 );
 
+interface ToggleRowProps {
+  label: string;
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+}
+
+const ToggleRow = ({ label, checked, onChange }: ToggleRowProps) => (
+  <label className="settings__row">
+    <span className="settings__label">{label}</span>
+    <input
+      type="checkbox"
+      checked={checked}
+      onChange={(event) => {
+        onChange(event.target.checked);
+      }}
+    />
+  </label>
+);
+
 interface SettingsPanelProps {
   settings: FluidSettings;
   resolution: ResolutionSettings;
@@ -108,6 +127,14 @@ export const SettingsPanel = ({
               }}
             />
           ))}
+
+          <ToggleRow
+            label="Wrap edges"
+            checked={settings.wrapEdges}
+            onChange={(wrapEdges) => {
+              onChange({ ...settings, wrapEdges });
+            }}
+          />
 
           {RESOLUTION_DESCRIPTORS.map((descriptor) => (
             <SliderRow

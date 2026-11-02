@@ -10,9 +10,10 @@ export const UNIFORM = {
   aspect: 3,
   toCells: 4,
   toStored: 6,
+  wrapEdges: 8,
 } as const;
 
-export const UNIFORM_FLOATS = 8;
+export const UNIFORM_FLOATS = 12;
 export const UNIFORM_BYTES = UNIFORM_FLOATS * 4;
 
 /** Float index of each `SplatUniforms` member in `simulation.wgsl` — WGSL
@@ -46,6 +47,7 @@ export const packUniforms = (
   dyeGrid: Grid,
   scale: ProjectionScale,
   dt: number,
+  wrapEdges: boolean,
 ): void => {
   target.set([simGrid.width, simGrid.height], UNIFORM.simSize);
   target[UNIFORM.dt] = dt;
@@ -53,6 +55,7 @@ export const packUniforms = (
   const metric = projectionUniform(scale);
   target.set(metric.toCells, UNIFORM.toCells);
   target.set(metric.toStored, UNIFORM.toStored);
+  target[UNIFORM.wrapEdges] = wrapEdges ? 1 : 0;
 };
 
 export const packSplatUniforms = (

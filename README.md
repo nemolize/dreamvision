@@ -5,8 +5,9 @@ GPU with [WebGPU](https://www.w3.org/TR/webgpu/) compute shaders. It opens
 mid-motion and settles as the dye dissipates; drag anywhere to stir it. Under
 `prefers-reduced-motion` it opens still instead, and waits for a drag or a
 keypress before it animates. A panel behind the gear in the corner tunes the
-solver live — decay rates, splat size and force, pressure sweeps, and the grid
-resolutions — and remembers what you set.
+solver live — decay rates, splat size and force, pressure sweeps, whether the
+edges are walls or wrap around, and the grid resolutions — and remembers what
+you set.
 
 **[Open the live demo →](https://dreamvision.nemolize.workers.dev/)**
 (needs a [WebGPU-capable browser](#requirements))
