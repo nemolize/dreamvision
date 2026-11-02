@@ -227,14 +227,13 @@ export const FluidCanvas = () => {
         previous = now;
 
         if (!motion.open) {
-          schedule.pause();
           frameId = requestAnimationFrame(loop);
           return;
         }
 
         schedule.advance(elapsed, {
           consume: () => pointer.consume(),
-          frame: (splats) => renderer?.frame(splats),
+          frame: (splats, dt) => renderer?.frame(splats, dt),
         });
 
         frameId = requestAnimationFrame(loop);

@@ -1,4 +1,4 @@
-import { MAX_STEPS_PER_FRAME, TIME_STEP } from "./config";
+import { MAX_FRAME_SECONDS } from "./config";
 
 /** Narrower than `Window` so a caller without `matchMedia` — an older browser,
  * a bare test double — is a type the signature admits rather than a cast. */
@@ -15,14 +15,10 @@ export interface MotionQueryView {
 export const reducedMotionQuery = (view: MotionQueryView): MotionQuery | null =>
   view.matchMedia?.("(prefers-reduced-motion: reduce)") ?? null;
 
-/** Clamped, not dropped: a slow renderer legitimately exceeds the budget every
- * frame, and discarding those gaps would stop the simulation advancing at all. */
-const MAX_FRAME_GAP_SECONDS = MAX_STEPS_PER_FRAME * TIME_STEP;
-
-/** Capped for the gap `visibilitychange` lets through with the gate open;
- * floored because rAF can timestamp before the `performance.now()` before it. */
+/** Clamped, not dropped: a slow renderer exceeds the cap every frame, and dropping
+ * those gaps would stop the simulation. Floored: rAF can timestamp early. */
 export const creditedElapsed = (elapsed: number): number =>
-  Math.min(Math.max(elapsed, 0), MAX_FRAME_GAP_SECONDS);
+  Math.min(Math.max(elapsed, 0), MAX_FRAME_SECONDS);
 
 export class MotionGate {
   private reducedMotion: boolean;

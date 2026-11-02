@@ -1,4 +1,4 @@
-import { MAX_SPLATS_PER_FRAME, TIME_STEP } from "./config";
+import { MAX_SPLATS_PER_FRAME } from "./config";
 import type { DoubleBuffer } from "./doubleBuffer";
 import { encodeFrame } from "./frame";
 import type { Grid } from "./grid";
@@ -154,7 +154,7 @@ export const createFluidRenderer = (
 
   resize(width, height);
 
-  const frame = (splats: readonly Splat[]): void => {
+  const frame = (splats: readonly Splat[], dt: number): void => {
     const current = resources;
     if (current === null) return;
 
@@ -163,7 +163,7 @@ export const createFluidRenderer = (
       current.simGrid,
       current.dyeGrid,
       current.scale,
-      TIME_STEP,
+      dt,
     );
     device.queue.writeBuffer(uniformBuffer, 0, uniformData);
 
