@@ -86,3 +86,18 @@ export const waitFrames = (page: Page, count: number): Promise<void> =>
       }),
     count,
   );
+
+/** Shrinks the grids and the pressure solve so a frame stays cheap against CI's
+ * software renderer, where full-size frames take seconds. Needs the panel open. */
+export const cheapenGrids = async (page: Page): Promise<void> => {
+  await settleSlider(page, "Sim grid", "64");
+  await settleSlider(page, "Dye grid", "256");
+  await settleSlider(page, "Pressure sweeps", "8");
+};
+
+/** Pins the splat strength the motion reads were tuned at, so a change to the
+ * defaults cannot dim the stroke below what they can see. Needs the panel open. */
+export const pinStrongSplats = async (page: Page): Promise<void> => {
+  await page.getByRole("slider", { name: "Splat size" }).fill("0.0035");
+  await page.getByRole("slider", { name: "Splat force" }).fill("30");
+};
