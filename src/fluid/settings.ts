@@ -85,7 +85,7 @@ export const SETTING_DESCRIPTORS: readonly SettingDescriptor<
     key: "vorticityConfinement",
     label: "Vorticity",
     min: 0,
-    max: 100,
+    max: 50,
     step: 1,
     precision: 0,
   },
