@@ -32,7 +32,6 @@ export default defineConfig({
         "src/test-setup.ts",
         "src/main.tsx",
         "src/App.tsx",
-        "src/FluidCanvas.tsx",
         "src/fluid/doubleBuffer.ts",
         "src/fluid/frame.ts",
         "src/fluid/gpu.ts",

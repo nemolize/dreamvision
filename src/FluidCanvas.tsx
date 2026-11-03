@@ -91,16 +91,16 @@ export const FluidCanvas = () => {
 
   useEffect(() => {
     const canvas = canvasRef.current;
+    // Only narrows the type: the canvas is mounted before any effect runs.
+    /* v8 ignore next -- @preserve */
     if (canvas === null) return;
 
     const pointer = new PointerTracker();
     pointer.setForce(settingsRef.current.splatForce);
     pointerRef.current = pointer;
     const motionQuery = reducedMotionQuery(window);
-    const motion = new MotionGate(
-      motionQuery?.matches ?? false,
-      document.hidden,
-    );
+    const prefersReducedMotion = (): boolean => motionQuery?.matches ?? false;
+    const motion = new MotionGate(prefersReducedMotion(), document.hidden);
     let renderer: FluidRenderer | null = null;
     let gpuDevice: GPUDevice | null = null;
     let frameId = 0;
@@ -141,7 +141,7 @@ export const FluidCanvas = () => {
     };
 
     const onMotionPreferenceChange = (): void => {
-      motion.setReducedMotion(motionQuery?.matches ?? false);
+      motion.setReducedMotion(prefersReducedMotion());
     };
 
     // Keyboard and assistive-technology users never fire pointerdown, so without
