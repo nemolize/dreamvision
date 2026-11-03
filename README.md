@@ -84,6 +84,12 @@ The conversion between stored velocity and grid cells is derived in
 GPU adapter, which makes those numbers the one part of the solver a unit test
 can reach.
 
+Each frame also runs a vorticity-confinement step between the splats and the
+projection: `curl` measures the velocity's rotation and `confine` pushes the flow
+around each peak the way it is already turning, which keeps the small swirls
+that advection would smear out. `vorticity.test.ts` checks the same arithmetic
+on the CPU, and a strength of 0 skips both passes.
+
 One deviation from a textbook solver remains: `divergence` and
 `gradientSubtract` use central differences while the Jacobi sweep solves a
 1-cell Laplacian, so the sweep does not invert the operator whose divergence it
@@ -99,12 +105,12 @@ the options are in
 
 ### The settings panel
 
-The gear opens seven sliders over the running canvas. The five solver settings
+The gear opens eight sliders over the running canvas. The six solver settings
 reach the running frame as the slider moves; the two grid resolutions wait for
-the drag to end, for the reason the next section gives. All seven are stored, so
+the drag to end, for the reason the next section gives. All eight are stored, so
 the next load opens where you left it.
 
-![The settings panel open over the running simulation, showing its seven sliders and their current values](docs/images/settings.webp)
+![The settings panel open over the running simulation, showing its sliders and their current values](docs/images/settings.webp)
 
 ### What the resolution sliders cost
 

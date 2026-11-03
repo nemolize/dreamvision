@@ -94,7 +94,7 @@ describe("UNIFORM", () => {
 });
 
 describe("packUniforms", () => {
-  const pack = (wrapEdges = false): Float32Array => {
+  const pack = (wrapEdges = false, vorticity = 0): Float32Array => {
     const target = new Float32Array(UNIFORM_FLOATS);
     packUniforms(
       target,
@@ -103,6 +103,7 @@ describe("packUniforms", () => {
       projectionScale(64, 32),
       1 / 60,
       wrapEdges,
+      vorticity,
     );
     return target;
   };
@@ -110,6 +111,10 @@ describe("packUniforms", () => {
   it("writes the wrap flag as 1 when edges join and 0 when they are walls", () => {
     expect(pack(true)[UNIFORM.wrapEdges]).toBe(1);
     expect(pack(false)[UNIFORM.wrapEdges]).toBe(0);
+  });
+
+  it("writes the confinement strength into its own member", () => {
+    expect(pack(false, 37)[UNIFORM.vorticity]).toBe(37);
   });
 
   it("writes the simulation grid, not the dye grid, into simSize", () => {
@@ -147,6 +152,7 @@ describe("packUniforms", () => {
       projectionScale(8, 8),
       1,
       true,
+      1,
     );
     for (const offset of Object.values(UNIFORM)) {
       expect(target[offset]).not.toBeNaN();

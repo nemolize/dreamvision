@@ -4,6 +4,7 @@ import {
   SPLAT_FORCE,
   SPLAT_RADIUS,
   VELOCITY_DISSIPATION,
+  VORTICITY_CONFINEMENT,
 } from "./config";
 import type { SettingDescriptor } from "./descriptor";
 import { describeSettings } from "./descriptor";
@@ -16,6 +17,7 @@ export interface NumericSettings {
   splatRadius: number;
   splatForce: number;
   pressureIterations: number;
+  vorticityConfinement: number;
 }
 
 export interface FluidSettings extends NumericSettings {
@@ -28,6 +30,7 @@ const NUMERIC_DEFAULTS: NumericSettings = {
   splatRadius: SPLAT_RADIUS,
   splatForce: SPLAT_FORCE,
   pressureIterations: PRESSURE_ITERATIONS,
+  vorticityConfinement: VORTICITY_CONFINEMENT,
 };
 
 export const DEFAULT_SETTINGS: FluidSettings = {
@@ -75,6 +78,14 @@ export const SETTING_DESCRIPTORS: readonly SettingDescriptor<
     label: "Pressure sweeps",
     min: 1,
     max: 64,
+    step: 1,
+    precision: 0,
+  },
+  {
+    key: "vorticityConfinement",
+    label: "Vorticity",
+    min: 0,
+    max: 50,
     step: 1,
     precision: 0,
   },

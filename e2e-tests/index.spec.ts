@@ -53,7 +53,7 @@ test.describe("fluid canvas", () => {
     await page.getByRole("button", { name: "Open settings" }).click();
 
     await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
-    await expect(page.getByRole("slider")).toHaveCount(7);
+    await expect(page.getByRole("slider")).toHaveCount(8);
   });
 
   test("restores a changed setting after a reload, and drops it on reset", async ({
@@ -386,6 +386,7 @@ test.describe("fluid canvas", () => {
 
       await page.getByRole("button", { name: "Open settings" }).click();
       await settleSlider(page, "Splat force", "60");
+      await settleSlider(page, "Vorticity", "0");
       await cheapenGrids(page);
       await page.getByRole("checkbox", { name: "Wrap edges" }).setChecked(wrap);
       await hideSettings(page);

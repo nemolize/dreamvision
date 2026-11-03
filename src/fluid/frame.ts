@@ -12,6 +12,7 @@ export interface FrameEncode {
   splatCount: number;
   splatSlotBytes: number;
   pressureIterations: number;
+  vorticityConfinement: number;
 }
 
 export const encodeFrame = ({
@@ -24,6 +25,7 @@ export const encodeFrame = ({
   splatCount,
   splatSlotBytes,
   pressureIterations,
+  vorticityConfinement,
 }: FrameEncode): void => {
   const { simGrid, dyeGrid, velocity, dye, pressure } = resources;
 
@@ -65,6 +67,16 @@ export const encodeFrame = ({
 
     run(pipelines.splat, resources.splatDye[dye.readFace], dyeDispatch);
     dye.swap();
+  }
+
+  if (vorticityConfinement > 0) {
+    run(pipelines.curl, resources.curlPass[velocity.readFace], simDispatch);
+    run(
+      pipelines.confine,
+      resources.confinePass[velocity.readFace],
+      simDispatch,
+    );
+    velocity.swap();
   }
 
   run(

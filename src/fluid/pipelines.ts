@@ -16,12 +16,16 @@ export interface Pipelines {
   sharedLayout: GPUBindGroupLayout;
   splatUniformLayout: GPUBindGroupLayout;
   advectLayout: GPUBindGroupLayout;
+  curlLayout: GPUBindGroupLayout;
+  confineLayout: GPUBindGroupLayout;
   divergenceLayout: GPUBindGroupLayout;
   pressureLayout: GPUBindGroupLayout;
   gradientLayout: GPUBindGroupLayout;
   splatLayout: GPUBindGroupLayout;
   renderLayout: GPUBindGroupLayout;
   advect: GPUComputePipeline;
+  curl: GPUComputePipeline;
+  confine: GPUComputePipeline;
   divergence: GPUComputePipeline;
   pressure: GPUComputePipeline;
   gradientSubtract: GPUComputePipeline;
@@ -93,6 +97,12 @@ export const createPipelines = (
   const advectLayout = device.createBindGroupLayout({
     entries: [texture(0), texture(1), storage(2, VELOCITY_FORMAT), uniform(3)],
   });
+  const curlLayout = device.createBindGroupLayout({
+    entries: [texture(0), storage(1, PRESSURE_FORMAT)],
+  });
+  const confineLayout = device.createBindGroupLayout({
+    entries: [texture(0), texture(1), storage(2, VELOCITY_FORMAT)],
+  });
   const divergenceLayout = device.createBindGroupLayout({
     entries: [texture(0), storage(1, PRESSURE_FORMAT)],
   });
@@ -149,12 +159,16 @@ export const createPipelines = (
     sharedLayout,
     splatUniformLayout,
     advectLayout,
+    curlLayout,
+    confineLayout,
     divergenceLayout,
     pressureLayout,
     gradientLayout,
     splatLayout,
     renderLayout,
     advect: computePipeline("advect", advectLayout),
+    curl: computePipeline("curl", curlLayout),
+    confine: computePipeline("confine", confineLayout),
     divergence: computePipeline("divergence", divergenceLayout),
     pressure: computePipeline("pressure", pressureLayout),
     gradientSubtract: computePipeline("gradientSubtract", gradientLayout),

@@ -21,6 +21,10 @@ export const MAX_FRAME_SECONDS = 1 / 30;
 export const VELOCITY_DISSIPATION = 0.2;
 export const DYE_DISSIPATION = 0.1;
 
+/** Strength of the vorticity confinement pass: cells per second of velocity
+ * added per second, per unit of curl. 0 switches the pass off. */
+export const VORTICITY_CONFINEMENT = 10;
+
 /** Divides squared distance in `exp(-d² / r)`, so it is a squared length, not
  * a radius. */
 export const SPLAT_RADIUS = 0.0005;

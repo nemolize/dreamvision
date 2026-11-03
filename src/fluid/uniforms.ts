@@ -11,6 +11,7 @@ export const UNIFORM = {
   toCells: 4,
   toStored: 6,
   wrapEdges: 8,
+  vorticity: 9,
 } as const;
 
 export const UNIFORM_FLOATS = 12;
@@ -48,6 +49,7 @@ export const packUniforms = (
   scale: ProjectionScale,
   dt: number,
   wrapEdges: boolean,
+  vorticity: number,
 ): void => {
   target.set([simGrid.width, simGrid.height], UNIFORM.simSize);
   target[UNIFORM.dt] = dt;
@@ -56,6 +58,7 @@ export const packUniforms = (
   target.set(metric.toCells, UNIFORM.toCells);
   target.set(metric.toStored, UNIFORM.toStored);
   target[UNIFORM.wrapEdges] = wrapEdges ? 1 : 0;
+  target[UNIFORM.vorticity] = vorticity;
 };
 
 export const packSplatUniforms = (
