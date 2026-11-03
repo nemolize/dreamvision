@@ -24,7 +24,7 @@ export default defineConfig({
       reporter: ["text", "html", "json", "json-summary"],
       reportOnFailure: true,
       include: ["src/**/*.{ts,tsx}", "port.ts"],
-      // Everything touching WebGPU needs a real adapter, which Node has no
+      // Modules that issue GPU commands need a real adapter, which Node has no
       // implementation of; the Playwright suite covers those instead.
       exclude: [
         "src/**/*.{test,spec}.*",

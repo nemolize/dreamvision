@@ -578,6 +578,46 @@ describe("FluidCanvas frame loop", () => {
     expect(onlyRenderer().frame).toHaveBeenCalledTimes(1);
   });
 
+  it("lifts the reduced-motion hold on Enter as well", async () => {
+    stubMotionQuery(true);
+    await mount();
+
+    expect(fireEvent.keyDown(getCanvas(), { key: "Enter" })).toBe(false);
+    runFrame();
+
+    expect(onlyRenderer().frame).toHaveBeenCalledTimes(1);
+  });
+
+  it("scales a drag by the stored splat force", async () => {
+    window.localStorage.setItem(
+      "dreamvision.settings",
+      JSON.stringify({ ...DEFAULT_SETTINGS, splatForce: 20 }),
+    );
+    await mount();
+    const canvas = getCanvas();
+
+    fireEvent.pointerDown(canvas, { pointerId: 1, clientX: 10, clientY: 10 });
+    fireEvent.pointerMove(canvas, { pointerId: 1, clientX: 30, clientY: 10 });
+    runFrame();
+
+    expect(splatsOfFrame(onlyRenderer(), 0)[0]?.dx).toBeCloseTo(0.2 * 20);
+  });
+
+  it("scales a drag by a splat force moved after mount", async () => {
+    await mount();
+    openPanel();
+    fireEvent.change(screen.getByRole("slider", { name: "Splat force" }), {
+      target: { value: "20" },
+    });
+    const canvas = getCanvas();
+
+    fireEvent.pointerDown(canvas, { pointerId: 1, clientX: 10, clientY: 10 });
+    fireEvent.pointerMove(canvas, { pointerId: 1, clientX: 30, clientY: 10 });
+    runFrame();
+
+    expect(splatsOfFrame(onlyRenderer(), 0)[0]?.dx).toBeCloseTo(0.2 * 20);
+  });
+
   it("lifts the reduced-motion hold on a pointer press", async () => {
     stubMotionQuery(true);
     await mount();
@@ -627,6 +667,15 @@ describe("FluidCanvas frame loop", () => {
     unmount();
 
     expect(onlyRenderer().frame).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not draw in a tab that opens hidden", async () => {
+    setDocumentHidden(true);
+    await mount();
+
+    runFrame();
+
+    expect(onlyRenderer().frame).not.toHaveBeenCalled();
   });
 
   it("skips drawing while the tab is hidden and resumes when it returns", async () => {
