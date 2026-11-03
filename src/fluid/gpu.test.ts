@@ -10,7 +10,7 @@ interface FakeWebGpu {
 }
 
 const stubWebGpu = (adapter: object | null): FakeWebGpu => {
-  const device = {};
+  const device = { label: "fake-device" };
   const requestDevice = vi.fn().mockResolvedValue(device);
   const fake: FakeWebGpu = {
     requestAdapter: vi
@@ -66,7 +66,7 @@ describe("initGpu", () => {
     );
   });
 
-  it("names the error so the notice can tell it from a crash", async () => {
+  it("gives the error its class name", async () => {
     vi.stubGlobal("navigator", {});
 
     await expect(initGpu(canvasWith({}))).rejects.toMatchObject({
@@ -88,6 +88,7 @@ describe("initGpu", () => {
       format: "bgra8unorm",
       alphaMode: "opaque",
     });
+    expect(result.device).toBe(gpu.device);
     expect(result).toEqual({
       device: gpu.device,
       context,
