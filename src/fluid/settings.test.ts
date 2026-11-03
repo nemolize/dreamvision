@@ -58,6 +58,12 @@ describe("normaliseSettings", () => {
     expect(Number.isInteger(DEFAULT_SETTINGS.pressureIterations)).toBe(true);
   });
 
+  it("lets the vorticity strength reach zero, which switches the pass off", () => {
+    expect(clampSetting("vorticityConfinement", 0)).toBe(0);
+    expect(clampSetting("vorticityConfinement", -3)).toBe(0);
+    expect(clampSetting("vorticityConfinement", 1e6)).toBe(100);
+  });
+
   it("clamps an out-of-range stored value", () => {
     expect(normaliseSettings({ pressureIterations: 1000 })).toMatchObject({
       pressureIterations: 64,

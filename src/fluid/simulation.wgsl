@@ -22,7 +22,7 @@ struct Uniforms {
   toCells: vec2f,
   toStored: vec2f,
   wrapEdges: f32,      // 1 joins opposite edges, 0 leaves them as walls
-  _pad0: f32,
+  vorticity: f32,      // confinement strength; 0 leaves the velocity untouched
   _pad1: f32,
   _pad2: f32,
 }
@@ -98,6 +98,60 @@ fn advect(@builtin(global_invocation_id) gid: vec3u) {
 
   let decay = 1.0 / (1.0 + advectParams.dissipation * u.dt);
   textureStore(advectOutput, gid.xy, advected * decay);
+}
+
+// ---------------------------------------------------------------- vorticity
+
+@group(1) @binding(0) var curlVelocity: texture_2d<f32>;
+@group(1) @binding(1) var curlOutput: texture_storage_2d<r32float, write>;
+
+/// The velocity's curl, in cells per second per cell: a central difference per
+/// axis, each component weighted into the cell metric like `divergence`.
+@compute @workgroup_size(WORKGROUP_SIZE, WORKGROUP_SIZE)
+fn curl(@builtin(global_invocation_id) gid: vec3u) {
+  let size = vec2u(u.simSize);
+  if (gid.x >= size.x || gid.y >= size.y) { return; }
+
+  let cell = vec2f(gid.xy);
+  let left = sampleAt(curlVelocity, u.simSize, cell - vec2f(1.0, 0.0)).y;
+  let right = sampleAt(curlVelocity, u.simSize, cell + vec2f(1.0, 0.0)).y;
+  let down = sampleAt(curlVelocity, u.simSize, cell - vec2f(0.0, 1.0)).x;
+  let up = sampleAt(curlVelocity, u.simSize, cell + vec2f(0.0, 1.0)).x;
+
+  let curlValue = 0.5 * (u.toCells.y * (right - left) - u.toCells.x * (up - down));
+  textureStore(curlOutput, gid.xy, vec4f(curlValue, 0.0, 0.0, 1.0));
+}
+
+@group(1) @binding(0) var confineVelocity: texture_2d<f32>;
+@group(1) @binding(1) var confineCurl: texture_2d<f32>;
+@group(1) @binding(2) var confineOutput: texture_storage_2d<rgba32float, write>;
+
+/// Keeps a flat curl field from dividing by zero when its gradient is
+/// normalised.
+const GRADIENT_EPSILON: f32 = 1e-4;
+
+/// Vorticity confinement: push the flow around each curl peak the way it is
+/// already turning, so small swirls the advection smeared out keep their spin.
+@compute @workgroup_size(WORKGROUP_SIZE, WORKGROUP_SIZE)
+fn confine(@builtin(global_invocation_id) gid: vec3u) {
+  let size = vec2u(u.simSize);
+  if (gid.x >= size.x || gid.y >= size.y) { return; }
+
+  let cell = vec2f(gid.xy);
+  let centre = sampleAt(confineCurl, u.simSize, cell).x;
+  let left = abs(sampleAt(confineCurl, u.simSize, cell - vec2f(1.0, 0.0)).x);
+  let right = abs(sampleAt(confineCurl, u.simSize, cell + vec2f(1.0, 0.0)).x);
+  let down = abs(sampleAt(confineCurl, u.simSize, cell - vec2f(0.0, 1.0)).x);
+  let up = abs(sampleAt(confineCurl, u.simSize, cell + vec2f(0.0, 1.0)).x);
+
+  let gradient = 0.5 * vec2f(right - left, up - down);
+  let direction = gradient / (length(gradient) + GRADIENT_EPSILON);
+  // A rate in cells per second squared, perpendicular to the curl's gradient.
+  let force = u.vorticity * centre * vec2f(direction.y, -direction.x);
+
+  let velocity = sampleAt(confineVelocity, u.simSize, cell).xy;
+  let confined = velocity + u.toStored * force * u.dt;
+  textureStore(confineOutput, gid.xy, vec4f(confined, 0.0, 1.0));
 }
 
 // ---------------------------------------------------------------- divergence

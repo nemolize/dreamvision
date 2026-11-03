@@ -27,6 +27,7 @@ export interface Resources {
   dye: DoubleBuffer;
   pressure: DoubleBuffer;
   divergence: GPUTexture;
+  curl: GPUTexture;
   ownedParamBuffers: readonly GPUBuffer[];
   advectVelocityParams: GPUBuffer;
   advectDyeParams: GPUBuffer;
@@ -34,6 +35,8 @@ export interface Resources {
   advectDye: ByVelocityThenDyeFace;
   splatVelocity: FacePair;
   splatDye: FacePair;
+  curlPass: FacePair;
+  confinePass: FacePair;
   divergencePass: FacePair;
   pressurePass: FacePair;
   gradientPass: ByPressureThenVelocityFace;
@@ -58,6 +61,13 @@ export const buildResources = (
     usage: STORAGE_USAGE,
   });
   const divergenceView = divergence.createView();
+
+  const curl = device.createTexture({
+    size: [simGrid.width, simGrid.height],
+    format: PRESSURE_FORMAT,
+    usage: STORAGE_USAGE,
+  });
+  const curlView = curl.createView();
 
   const makeParamBuffer = (values: Float32Array): GPUBuffer => {
     const buffer = device.createBuffer({
@@ -140,6 +150,21 @@ export const buildResources = (
     ]),
   );
 
+  const curlPass = perFace(velocity, (read) =>
+    bindGroup(pipelines.curlLayout, [
+      { binding: 0, resource: read },
+      { binding: 1, resource: curlView },
+    ]),
+  );
+
+  const confinePass = perFace(velocity, (read, write) =>
+    bindGroup(pipelines.confineLayout, [
+      { binding: 0, resource: read },
+      { binding: 1, resource: curlView },
+      { binding: 2, resource: write },
+    ]),
+  );
+
   const divergencePass = perFace(velocity, (read) =>
     bindGroup(pipelines.divergenceLayout, [
       { binding: 0, resource: read },
@@ -184,6 +209,7 @@ export const buildResources = (
     dye,
     pressure,
     divergence,
+    curl,
     ownedParamBuffers: [
       advectVelocityParams,
       advectDyeParams,
@@ -196,6 +222,8 @@ export const buildResources = (
     advectDye,
     splatVelocity,
     splatDye,
+    curlPass,
+    confinePass,
     divergencePass,
     pressurePass,
     gradientPass,
@@ -208,5 +236,6 @@ export const releaseResources = (current: Resources): void => {
   current.dye.destroy();
   current.pressure.destroy();
   current.divergence.destroy();
+  current.curl.destroy();
   for (const buffer of current.ownedParamBuffers) buffer.destroy();
 };

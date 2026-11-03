@@ -165,6 +165,7 @@ export const createFluidRenderer = (
       current.scale,
       dt,
       settings.wrapEdges,
+      settings.vorticityConfinement,
     );
     device.queue.writeBuffer(uniformBuffer, 0, uniformData);
 
@@ -190,6 +191,7 @@ export const createFluidRenderer = (
       splatCount: applied.length,
       splatSlotBytes,
       pressureIterations: settings.pressureIterations,
+      vorticityConfinement: settings.vorticityConfinement,
     });
   };
 
