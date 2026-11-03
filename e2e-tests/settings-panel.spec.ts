@@ -1,7 +1,19 @@
-import { expect, type Locator, test } from "@playwright/test";
+import { expect, type Locator, type Page, test } from "@playwright/test";
 
 const outlineStyle = (locator: Locator): Promise<string> =>
   locator.evaluate((element) => getComputedStyle(element).outlineStyle);
+
+/** `:focus-visible` matches only focus the browser attributes to the keyboard,
+ * so a bare `focus()` after a click would show no ring. */
+const focusWithKeyboard = async (
+  page: Page,
+  control: Locator,
+): Promise<void> => {
+  await control.focus();
+  await page.keyboard.press("Shift+Tab");
+  await page.keyboard.press("Tab");
+  await expect(control).toBeFocused();
+};
 
 test.describe("settings panel accessibility", () => {
   test("shows a focus ring on every control for the keyboard, not the mouse", async ({
@@ -14,10 +26,11 @@ test.describe("settings panel accessibility", () => {
     await expect(toggle).toBeFocused();
     await expect(outlineStyle(toggle)).resolves.toBe("none");
 
-    await page.keyboard.press("Tab");
-    await page.keyboard.press("Shift+Tab");
-    await expect(toggle).toBeFocused();
+    await focusWithKeyboard(page, toggle);
     await expect(outlineStyle(toggle)).resolves.toBe("solid");
+    expect(
+      await toggle.evaluate((element) => getComputedStyle(element).boxShadow),
+    ).not.toBe("none");
 
     const controls = [
       page.getByRole("slider").first(),
@@ -25,10 +38,7 @@ test.describe("settings panel accessibility", () => {
       page.getByRole("button", { name: "Reset" }),
     ];
     for (const control of controls) {
-      await control.focus();
-      await page.keyboard.press("Shift+Tab");
-      await page.keyboard.press("Tab");
-      await expect(control).toBeFocused();
+      await focusWithKeyboard(page, control);
       await expect(outlineStyle(control)).resolves.toBe("solid");
     }
   });
@@ -43,11 +53,61 @@ test.describe("settings panel accessibility", () => {
     });
     const probe = page.getByRole("button", { name: "Probe" });
 
-    await probe.focus();
-    await page.keyboard.press("Shift+Tab");
-    await page.keyboard.press("Tab");
-    await expect(probe).toBeFocused();
+    await focusWithKeyboard(page, probe);
     await expect(outlineStyle(probe)).resolves.toBe("solid");
+  });
+
+  test("rings the canvas, the first tab stop, inside the viewport", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    const canvas = page.getByLabel("Fluid simulation");
+
+    await focusWithKeyboard(page, canvas);
+    await expect(outlineStyle(canvas)).resolves.toBe("solid");
+    expect(
+      await canvas.evaluate(
+        (element) => getComputedStyle(element).outlineOffset,
+      ),
+    ).toBe("-4px");
+    expect(
+      await canvas.evaluate((element) => getComputedStyle(element).boxShadow),
+    ).toBe("none");
+  });
+
+  test("keeps the focus ring of the last slider inside the scrolled panel", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 640, height: 360 });
+    await page.goto("/");
+    await page.getByRole("button", { name: "Open settings" }).click();
+
+    // Tabbing down from the toggle scrolls only far enough to reveal each
+    // control, which is where a ring gets cut off.
+    const last = page.getByRole("slider").last();
+    const stopsBefore = await last.evaluate(
+      (element) =>
+        Array.from(
+          element.closest(".settings__panel")?.querySelectorAll("input") ?? [],
+        ).findIndex((input) => input === element) + 1,
+    );
+    for (let press = 0; press < stopsBefore; press++) {
+      await page.keyboard.press("Tab");
+    }
+    await expect(last).toBeFocused();
+
+    const { ringBottom, panelBottom } = await last.evaluate((element) => {
+      const panel = element.closest(".settings__panel");
+      if (panel === null) throw new Error("slider outside the panel");
+      const style = getComputedStyle(element);
+      const reach =
+        parseFloat(style.outlineWidth) + parseFloat(style.outlineOffset);
+      return {
+        ringBottom: element.getBoundingClientRect().bottom + reach,
+        panelBottom: panel.getBoundingClientRect().bottom,
+      };
+    });
+    expect(ringBottom).toBeLessThanOrEqual(panelBottom);
   });
 
   test("scrolls the panel on a short viewport so Reset stays reachable", async ({

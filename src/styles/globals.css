@@ -58,6 +58,12 @@ canvas {
 .settings__row input:focus-visible {
   outline: 2px solid #8ab4f8;
   outline-offset: 2px;
+  box-shadow: 0 0 0 6px #000;
+}
+
+canvas:focus-visible {
+  outline: 2px solid #8ab4f8;
+  outline-offset: -4px;
 }
 
 .settings__toggle:hover {
@@ -72,6 +78,7 @@ canvas {
     100dvh - 2rem - var(--settings-toggle-size) - var(--settings-gap)
   );
   overflow-y: auto;
+  scroll-padding-block: 0.5rem;
   padding: 1rem;
   border: 1px solid #ffffff26;
   border-radius: 0.75rem;
