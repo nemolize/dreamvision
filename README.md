@@ -143,18 +143,19 @@ without that the notice would be a dead end.
 
 ## Scripts
 
-| Script                    | What it does                                                 |
-| ------------------------- | ------------------------------------------------------------ |
-| `pnpm dev`                | Start the development server                                 |
-| `pnpm build`              | Production build                                             |
-| `pnpm preview`            | Serve the production build on the Workers runtime            |
-| `pnpm lint`               | ESLint + knip + type-check + Prettier + zizmor (in parallel) |
-| `pnpm fix`                | Auto-fix ESLint and Prettier issues                          |
-| `pnpm test`               | Unit tests (Vitest)                                          |
-| `pnpm run test:coverage`  | Unit tests with coverage                                     |
-| `pnpm run test:e2e`       | End-to-end tests (Playwright)                                |
-| `pnpm run deploy`         | Build and deploy the production Worker                       |
-| `pnpm run deploy:preview` | Build and deploy the `dreamvision-preview` Worker            |
+| Script                       | What it does                                                                 |
+| ---------------------------- | ---------------------------------------------------------------------------- |
+| `pnpm dev`                   | Start the development server                                                 |
+| `pnpm build`                 | Production build                                                             |
+| `pnpm preview`               | Serve the production build on the Workers runtime                            |
+| `pnpm run check:bundle-size` | Fail if the built JS or CSS exceeds its gzip budget (run after `pnpm build`) |
+| `pnpm lint`                  | ESLint + knip + type-check + Prettier + zizmor (in parallel)                 |
+| `pnpm fix`                   | Auto-fix ESLint and Prettier issues                                          |
+| `pnpm test`                  | Unit tests (Vitest)                                                          |
+| `pnpm run test:coverage`     | Unit tests with coverage                                                     |
+| `pnpm run test:e2e`          | End-to-end tests (Playwright)                                                |
+| `pnpm run deploy`            | Build and deploy the production Worker                                       |
+| `pnpm run deploy:preview`    | Build and deploy the `dreamvision-preview` Worker                            |
 
 ### Testing notes
 
