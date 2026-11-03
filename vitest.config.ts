@@ -23,7 +23,7 @@ export default defineConfig({
       // json + json-summary feed the coverage report action in CI.
       reporter: ["text", "html", "json", "json-summary"],
       reportOnFailure: true,
-      include: ["src/**/*.{ts,tsx}", "port.ts"],
+      include: ["src/**/*.{ts,tsx}", "bundle-size.ts", "port.ts"],
       // Everything touching WebGPU needs a real adapter, which Node has no
       // implementation of; the Playwright suite covers those instead.
       exclude: [

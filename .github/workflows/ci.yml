@@ -86,7 +86,10 @@ jobs:
           # A run that failed before writing the summary leaves the last table standing.
           on-empty: skip
       - if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
+        id: build
         run: pnpm run build
+      - if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: pnpm run check:bundle-size
 
   E2ETests:
     runs-on: ubuntu-26.04
