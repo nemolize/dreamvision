@@ -23,13 +23,16 @@ canvas {
 }
 
 .settings {
+  --settings-toggle-size: 2.5rem;
+  --settings-gap: 0.5rem;
+
   position: fixed;
   top: 1rem;
   right: 1rem;
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  gap: 0.5rem;
+  gap: var(--settings-gap);
   color: #e8eaed;
   font:
     0.8125rem/1.4 system-ui,
@@ -37,8 +40,8 @@ canvas {
 }
 
 .settings__toggle {
-  width: 2.5rem;
-  height: 2.5rem;
+  width: var(--settings-toggle-size);
+  height: var(--settings-toggle-size);
   border: 1px solid #ffffff26;
   border-radius: 50%;
   background: #000000a6;
@@ -49,6 +52,14 @@ canvas {
   backdrop-filter: blur(8px);
 }
 
+.settings__toggle:focus-visible,
+.settings__reset:focus-visible,
+.notice__action:focus-visible,
+.settings__row input:focus-visible {
+  outline: 2px solid #8ab4f8;
+  outline-offset: 2px;
+}
+
 .settings__toggle:hover {
   background: #000000d9;
 }
@@ -57,6 +68,10 @@ canvas {
   display: grid;
   gap: 0.75rem;
   width: min(20rem, calc(100vw - 2rem));
+  max-height: calc(
+    100dvh - 2rem - var(--settings-toggle-size) - var(--settings-gap)
+  );
+  overflow-y: auto;
   padding: 1rem;
   border: 1px solid #ffffff26;
   border-radius: 0.75rem;
