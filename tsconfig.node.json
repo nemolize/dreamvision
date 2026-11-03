@@ -6,6 +6,10 @@
     "allowImportingTsExtensions": true
   },
   "include": [
+    "bundle-size.ts",
+    "bundle-size.test.ts",
+    "check-bundle-size.test.ts",
+    "check-bundle-size.ts",
     "port.ts",
     "port.test.ts",
     "vite.config.ts",
