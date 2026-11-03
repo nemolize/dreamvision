@@ -34,6 +34,10 @@ describe("GpuNotice", () => {
       screen.getByRole("button", { name: "Reset resolution and reload" }),
     );
 
+    expect(
+      screen.getByRole("button", { name: "Reset resolution and reload" })
+        .className,
+    ).toBe("notice__action");
     // The stored resolution is what a reload would rebuild at, so without this
     // the notice is a dead end rather than a way out.
     expect(onResetResolution).toHaveBeenCalledTimes(1);
