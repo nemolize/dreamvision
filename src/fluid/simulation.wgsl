@@ -23,8 +23,10 @@ struct Uniforms {
   toStored: vec2f,
   wrapEdges: f32,      // 1 joins opposite edges, 0 leaves them as walls
   vorticity: f32,      // confinement strength; 0 leaves the velocity untouched
-  _pad1: f32,
+  buoyancy: f32,       // cells per second squared per unit of heat; 0 adds no lift
   _pad2: f32,
+  up: vec2f,           // unit screen-space direction heat rises, y down
+  _pad3: vec2f,
 }
 
 @group(0) @binding(0) var<uniform> u: Uniforms;
@@ -71,7 +73,7 @@ fn applyVelocityBoundary(velocity: vec2f, id: vec2u, size: vec2u) -> vec2f {
 struct AdvectParams {
   gridSize: vec2f,
   dissipation: f32,
-  _pad: f32,
+  heatDissipation: f32,   // the alpha channel's own decay: the cooling rate
 }
 
 @group(1) @binding(0) var advectSource: texture_2d<f32>;
@@ -96,7 +98,12 @@ fn advect(@builtin(global_invocation_id) gid: vec3u) {
   let source = cell - velocity * u.dt * advectParams.gridSize;
   let advected = sampleAt(advectSource, advectParams.gridSize, source);
 
-  let decay = 1.0 / (1.0 + advectParams.dissipation * u.dt);
+  let decay = 1.0 / (1.0 + vec4f(
+    advectParams.dissipation,
+    advectParams.dissipation,
+    advectParams.dissipation,
+    advectParams.heatDissipation,
+  ) * u.dt);
   textureStore(advectOutput, gid.xy, advected * decay);
 }
 
@@ -152,6 +159,31 @@ fn confine(@builtin(global_invocation_id) gid: vec3u) {
   let velocity = sampleAt(confineVelocity, u.simSize, cell).xy;
   let confined = velocity + u.toStored * force * u.dt;
   textureStore(confineOutput, gid.xy, vec4f(confined, 0.0, 1.0));
+}
+
+// ----------------------------------------------------------------- buoyancy
+
+@group(1) @binding(0) var buoyancyVelocity: texture_2d<f32>;
+@group(1) @binding(1) var buoyancyDye: texture_2d<f32>;
+@group(1) @binding(2) var buoyancyOutput: texture_storage_2d<rgba32float, write>;
+
+/// Lift hot cells along `up`: heat rides in the dye's alpha channel, read on the
+/// dye grid at this cell's centre because the velocity grid is the coarser one.
+@compute @workgroup_size(WORKGROUP_SIZE, WORKGROUP_SIZE)
+fn buoyancy(@builtin(global_invocation_id) gid: vec3u) {
+  let size = vec2u(u.simSize);
+  if (gid.x >= size.x || gid.y >= size.y) { return; }
+
+  let cell = vec2f(gid.xy);
+  let dyeSize = vec2f(textureDimensions(buoyancyDye));
+  let dyeCell = (cell + 0.5) / u.simSize * dyeSize - 0.5;
+  let heat = sampleAt(buoyancyDye, dyeSize, dyeCell).a;
+
+  // A rate in cells per second squared, like the confinement force.
+  let force = u.buoyancy * heat * u.up;
+  let velocity = sampleAt(buoyancyVelocity, u.simSize, cell).xy;
+  let lifted = velocity + u.toStored * force * u.dt;
+  textureStore(buoyancyOutput, gid.xy, vec4f(lifted, 0.0, 1.0));
 }
 
 // ---------------------------------------------------------------- divergence
@@ -262,7 +294,7 @@ fn resample(@builtin(global_invocation_id) gid: vec3u) {
 
 struct SplatParams {
   gridSize: vec2f,
-  isVelocity: f32,   // 1 writes a force into .xy, 0 adds colour into .rgb
+  isVelocity: f32,   // 1 writes a force into .xy, 0 adds colour into .rgb and heat into .a
   _pad: f32,
 }
 
@@ -274,7 +306,7 @@ struct SplatUniforms {
   delta: vec2f,        // a displacement rather than a rate
   color: vec4f,
   radius: f32,         // divides squared distance, so a squared length
-  _pad0: f32,
+  heat: f32,           // peak temperature a dye splat adds into the alpha channel
   _pad1: f32,
   _pad2: f32,
 }
@@ -306,7 +338,7 @@ fn splat(@builtin(global_invocation_id) gid: vec3u) {
   if (splatParams.isVelocity > 0.5) {
     added = vec4f(s.delta * falloff, 0.0, 0.0);
   } else {
-    added = vec4f(s.color.rgb * falloff, 0.0);
+    added = vec4f(s.color.rgb * falloff, s.heat * falloff);
   }
 
   textureStore(splatOutput, gid.xy, existing + added);

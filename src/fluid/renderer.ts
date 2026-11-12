@@ -1,6 +1,7 @@
 import { MAX_SPLATS_PER_FRAME } from "./config";
 import type { DoubleBuffer } from "./doubleBuffer";
 import { encodeFrame } from "./frame";
+import type { Direction } from "./gravity";
 import type { Grid } from "./grid";
 import { fitGrids, needsRebuild } from "./grid";
 import { createPipelines } from "./pipelines";
@@ -137,11 +138,15 @@ export const createFluidRenderer = (
     rebuild(canvasSize.width, canvasSize.height);
   };
 
-  const writeDissipation = (buffer: GPUBuffer, rate: number): void => {
+  const writeDissipation = (
+    buffer: GPUBuffer,
+    rate: number,
+    heatRate = rate,
+  ): void => {
     device.queue.writeBuffer(
       buffer,
       ADVECT_PARAM.dissipation * 4,
-      new Float32Array([rate]),
+      new Float32Array([rate, heatRate]),
     );
   };
 
@@ -149,12 +154,16 @@ export const createFluidRenderer = (
     settings = next;
     if (resources === null) return;
     writeDissipation(resources.advectVelocityParams, next.velocityDissipation);
-    writeDissipation(resources.advectDyeParams, next.dyeDissipation);
+    writeDissipation(
+      resources.advectDyeParams,
+      next.dyeDissipation,
+      next.heatCooling,
+    );
   };
 
   resize(width, height);
 
-  const frame = (splats: readonly Splat[], dt: number): void => {
+  const frame = (splats: readonly Splat[], dt: number, up: Direction): void => {
     const current = resources;
     if (current === null) return;
 
@@ -166,6 +175,8 @@ export const createFluidRenderer = (
       dt,
       settings.wrapEdges,
       settings.vorticityConfinement,
+      settings.buoyancy,
+      up,
     );
     device.queue.writeBuffer(uniformBuffer, 0, uniformData);
 
@@ -192,6 +203,7 @@ export const createFluidRenderer = (
       splatSlotBytes,
       pressureIterations: settings.pressureIterations,
       vorticityConfinement: settings.vorticityConfinement,
+      buoyancy: settings.buoyancy,
     });
   };
 

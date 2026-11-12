@@ -37,6 +37,7 @@ export interface Resources {
   splatDye: FacePair;
   curlPass: FacePair;
   confinePass: FacePair;
+  buoyancyPass: ByVelocityThenDyeFace;
   divergencePass: FacePair;
   pressurePass: FacePair;
   gradientPass: ByPressureThenVelocityFace;
@@ -88,7 +89,7 @@ export const buildResources = (
     packAdvectParams(simGrid, settings.velocityDissipation),
   );
   const advectDyeParams = makeParamBuffer(
-    packAdvectParams(dyeGrid, settings.dyeDissipation),
+    packAdvectParams(dyeGrid, settings.dyeDissipation, settings.heatCooling),
   );
   const splatVelocityParams = makeSplatParams(simGrid, 1);
   const splatDyeParams = makeSplatParams(dyeGrid, 0);
@@ -165,6 +166,23 @@ export const buildResources = (
     ]),
   );
 
+  const buoyancyPass: ByVelocityThenDyeFace = [
+    perFace(dye, (dyeRead) =>
+      bindGroup(pipelines.buoyancyLayout, [
+        { binding: 0, resource: velocity.views[0] },
+        { binding: 1, resource: dyeRead },
+        { binding: 2, resource: velocity.views[1] },
+      ]),
+    ),
+    perFace(dye, (dyeRead) =>
+      bindGroup(pipelines.buoyancyLayout, [
+        { binding: 0, resource: velocity.views[1] },
+        { binding: 1, resource: dyeRead },
+        { binding: 2, resource: velocity.views[0] },
+      ]),
+    ),
+  ];
+
   const divergencePass = perFace(velocity, (read) =>
     bindGroup(pipelines.divergenceLayout, [
       { binding: 0, resource: read },
@@ -224,6 +242,7 @@ export const buildResources = (
     splatDye,
     curlPass,
     confinePass,
+    buoyancyPass,
     divergencePass,
     pressurePass,
     gradientPass,

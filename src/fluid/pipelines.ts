@@ -18,6 +18,7 @@ export interface Pipelines {
   advectLayout: GPUBindGroupLayout;
   curlLayout: GPUBindGroupLayout;
   confineLayout: GPUBindGroupLayout;
+  buoyancyLayout: GPUBindGroupLayout;
   divergenceLayout: GPUBindGroupLayout;
   pressureLayout: GPUBindGroupLayout;
   gradientLayout: GPUBindGroupLayout;
@@ -26,6 +27,7 @@ export interface Pipelines {
   advect: GPUComputePipeline;
   curl: GPUComputePipeline;
   confine: GPUComputePipeline;
+  buoyancy: GPUComputePipeline;
   divergence: GPUComputePipeline;
   pressure: GPUComputePipeline;
   gradientSubtract: GPUComputePipeline;
@@ -103,6 +105,9 @@ export const createPipelines = (
   const confineLayout = device.createBindGroupLayout({
     entries: [texture(0), texture(1), storage(2, VELOCITY_FORMAT)],
   });
+  const buoyancyLayout = device.createBindGroupLayout({
+    entries: [texture(0), texture(1), storage(2, VELOCITY_FORMAT)],
+  });
   const divergenceLayout = device.createBindGroupLayout({
     entries: [texture(0), storage(1, PRESSURE_FORMAT)],
   });
@@ -161,6 +166,7 @@ export const createPipelines = (
     advectLayout,
     curlLayout,
     confineLayout,
+    buoyancyLayout,
     divergenceLayout,
     pressureLayout,
     gradientLayout,
@@ -169,6 +175,7 @@ export const createPipelines = (
     advect: computePipeline("advect", advectLayout),
     curl: computePipeline("curl", curlLayout),
     confine: computePipeline("confine", confineLayout),
+    buoyancy: computePipeline("buoyancy", buoyancyLayout),
     divergence: computePipeline("divergence", divergenceLayout),
     pressure: computePipeline("pressure", pressureLayout),
     gradientSubtract: computePipeline("gradientSubtract", gradientLayout),

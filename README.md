@@ -90,6 +90,15 @@ around each peak the way it is already turning, which keeps the small swirls
 that advection would smear out. `vorticity.test.ts` checks the same arithmetic
 on the CPU, and a strength of 0 skips both passes.
 
+Heat rides in the dye texture's alpha channel: a splat adds it in proportion to
+its colour, advection carries it with the dye, and its own cooling rate fades
+it. A `buoyancy` pass between the confinement and the projection lifts hot
+cells along the up direction, which follows the device's gravity reading
+(rotated by the screen's orientation and smoothed) and points up the screen
+when there is none. On iOS Safari the motion permission is requested on the
+first pointer release. `buoyancy.test.ts` checks the lift on the CPU, and a
+strength of 0 skips the pass.
+
 One deviation from a textbook solver remains: `divergence` and
 `gradientSubtract` use central differences while the Jacobi sweep solves a
 1-cell Laplacian, so the sweep does not invert the operator whose divergence it
@@ -105,9 +114,9 @@ the options are in
 
 ### The settings panel
 
-The gear opens eight sliders over the running canvas. The six solver settings
+The gear opens ten sliders over the running canvas. The eight solver settings
 reach the running frame as the slider moves; the two grid resolutions wait for
-the drag to end, for the reason the next section gives. All eight are stored, so
+the drag to end, for the reason the next section gives. All ten are stored, so
 the next load opens where you left it.
 
 ![The settings panel open over the running simulation, showing its sliders and their current values](docs/images/settings.webp)
