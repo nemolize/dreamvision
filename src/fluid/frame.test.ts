@@ -199,6 +199,10 @@ describe("encodeFrame's buoyancy", () => {
       "buoyancy",
     );
   });
+
+  it("runs the pass at a negative strength, which sinks hot dye", () => {
+    expect(encode(0, -10).map(([pipeline]) => pipeline)).toContain("buoyancy");
+  });
 });
 
 describe("encodeFrame's GPU timing", () => {

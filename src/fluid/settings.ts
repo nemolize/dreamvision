@@ -111,8 +111,8 @@ export const SETTING_DESCRIPTORS: readonly SettingDescriptor<
   {
     key: "gravity",
     label: "Gravity",
-    min: 0,
-    max: 30,
+    min: -100,
+    max: 100,
     step: 0.1,
     precision: 1,
   },

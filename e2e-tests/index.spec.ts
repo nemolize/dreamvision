@@ -417,7 +417,7 @@ test.describe("fluid canvas", () => {
     expect(wrapped).toBeGreaterThan(10);
   });
 
-  test("lifts hot dye toward the top of the screen only when buoyancy and gravity are above zero", async ({
+  test("lifts hot dye toward the top of the screen only when buoyancy and gravity are above zero, and sinks it for a negative gravity", async ({
     page,
   }) => {
     test.setTimeout(180_000);
@@ -449,10 +449,12 @@ test.describe("fluid canvas", () => {
     const still = await upwardShare("0");
     const lifted = await upwardShare("100");
     const weightless = await upwardShare("100", "0");
+    const sunk = await upwardShare("100", "-9.8");
 
     // 0.05 is chosen empirically, no fixed source.
     expect(lifted - still).toBeGreaterThan(0.05);
     expect(lifted - weightless).toBeGreaterThan(0.05);
+    expect(weightless - sunk).toBeGreaterThan(0.05);
   });
 
   test("paints the seed burst before any input", async ({ page }) => {

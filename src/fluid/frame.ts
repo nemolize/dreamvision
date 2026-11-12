@@ -86,7 +86,7 @@ export const encodeFrame = ({
     velocity.swap();
   }
 
-  if (buoyancy > 0) {
+  if (buoyancy !== 0) {
     run(
       pipelines.buoyancy,
       resources.buoyancyPass[velocity.readFace][dye.readFace],

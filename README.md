@@ -97,7 +97,8 @@ cells along the up direction, which follows the device's gravity reading
 (rotated by the screen's orientation and smoothed) and points up the screen
 when there is none. On iOS Safari the motion permission is requested on the
 first pointer release. The lift is the buoyancy setting scaled by the gravity
-setting over Earth's 9.8 m/s², so the default gravity leaves buoyancy alone.
+setting over Earth's 9.8 m/s², so the default gravity leaves buoyancy alone and a
+negative gravity sinks the hot dye.
 `buoyancy.test.ts` checks the lift on the CPU, and a lift of 0 (either setting
 at 0) skips the pass.
 

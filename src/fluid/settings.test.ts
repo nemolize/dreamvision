@@ -71,10 +71,11 @@ describe("normaliseSettings", () => {
     expect(clampSetting("buoyancy", 1e6)).toBe(1000);
   });
 
-  it("lets gravity reach zero, which switches the lift off", () => {
+  it("lets gravity run from -100 to 100, through zero, which switches the lift off", () => {
     expect(clampSetting("gravity", 0)).toBe(0);
-    expect(clampSetting("gravity", -3)).toBe(0);
-    expect(clampSetting("gravity", 1e6)).toBe(30);
+    expect(clampSetting("gravity", -3)).toBe(-3);
+    expect(clampSetting("gravity", -1e6)).toBe(-100);
+    expect(clampSetting("gravity", 1e6)).toBe(100);
   });
 
   it("defaults gravity to Earth's surface value, also for a blob that predates it", () => {
@@ -163,6 +164,10 @@ describe("liftStrength", () => {
   it("scales with gravity and with buoyancy", () => {
     expect(liftStrength({ buoyancy: 10, gravity: 19.6 })).toBeCloseTo(20, 10);
     expect(liftStrength({ buoyancy: 500, gravity: 9.8 })).toBeCloseTo(500, 10);
+  });
+
+  it("is negative for a negative gravity, which reverses the lift", () => {
+    expect(liftStrength({ buoyancy: 10, gravity: -9.8 })).toBeCloseTo(-10, 10);
   });
 
   it("is zero when either factor is zero, which skips the pass", () => {
