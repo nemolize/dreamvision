@@ -196,7 +196,8 @@ export const createFluidRenderer = (
       );
     });
 
-    const timing = onGpuTime === null ? null : (timer?.begin() ?? null);
+    const listener = onGpuTime;
+    const timing = listener === null ? null : (timer?.begin() ?? null);
     encodeFrame({
       device,
       context,
@@ -216,7 +217,7 @@ export const createFluidRenderer = (
     if (timing !== null) {
       void timer?.read().then(
         (milliseconds) => {
-          onGpuTime?.(milliseconds);
+          if (listener === onGpuTime) listener?.(milliseconds);
         },
         () => undefined,
       );

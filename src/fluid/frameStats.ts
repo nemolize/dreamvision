@@ -51,6 +51,7 @@ export class FrameStats {
 export class StatsMeter {
   private readonly stats = new FrameStats();
   private active = false;
+  private restartPending = false;
   private readonly renderer: Pick<FluidRenderer, "measureGpu">;
   private readonly publish: (reading: FrameReading | null) => void;
 
@@ -62,12 +63,17 @@ export class StatsMeter {
     this.publish = publish;
   }
 
+  /** The next update opens a fresh window: a hidden tab gets no animation
+   * frames, so the open one would otherwise span the whole gap. */
+  restart(): void {
+    this.restartPending = true;
+  }
+
   /** Called once per animation frame, drawn or not, so a window in which nothing
    * drew still closes and reads as empty. */
   update(now: number, show: boolean, drew: boolean): void {
     if (show !== this.active) {
       this.active = show;
-      this.stats.reset(now);
       this.renderer.measureGpu(
         show
           ? (milliseconds) => {
@@ -76,6 +82,11 @@ export class StatsMeter {
           : null,
       );
       if (!show) this.publish(null);
+      this.restartPending = true;
+    }
+    if (this.restartPending) {
+      this.restartPending = false;
+      this.stats.reset(now);
       return;
     }
     if (!this.active) return;

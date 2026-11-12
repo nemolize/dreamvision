@@ -94,8 +94,11 @@ export const FluidCanvas = () => {
       pointer.release(event.pointerId);
     };
 
+    let meter: StatsMeter | null = null;
+
     const onVisibilityChange = (): void => {
       motion.setHidden(document.hidden);
+      meter?.restart();
     };
 
     const onMotionPreferenceChange = (): void => {
@@ -180,7 +183,8 @@ export const FluidCanvas = () => {
           : [],
       );
 
-      const meter = new StatsMeter(renderer, setReading);
+      const frameMeter = new StatsMeter(renderer, setReading);
+      meter = frameMeter;
 
       const loop = (now: number): void => {
         const elapsed = (now - previous) / 1000;
@@ -188,7 +192,7 @@ export const FluidCanvas = () => {
         const { showStats } = settingsRef.current;
 
         if (!motion.open) {
-          meter.update(now, showStats, false);
+          frameMeter.update(now, showStats, false);
           frameId = requestAnimationFrame(loop);
           return;
         }
@@ -197,7 +201,7 @@ export const FluidCanvas = () => {
           consume: () => pointer.consume(),
           frame: (splats, dt) => renderer?.frame(splats, dt, gravity.step(dt)),
         });
-        meter.update(now, showStats, advanced > 0);
+        frameMeter.update(now, showStats, advanced > 0);
 
         frameId = requestAnimationFrame(loop);
       };

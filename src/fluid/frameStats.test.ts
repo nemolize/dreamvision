@@ -136,4 +136,17 @@ describe("StatsMeter", () => {
 
     expect(readings.at(-1)).toEqual({ fps: 2, gpuMilliseconds: null });
   });
+
+  it("opens a fresh window after a restart, never averaging over the gap", () => {
+    const { readings, meter } = meterOf();
+    meter.update(0, true, true);
+    meter.update(100, true, true);
+
+    meter.restart();
+    meter.update(60_000, true, true);
+    meter.update(60_250, true, true);
+    meter.update(60_500, true, true);
+
+    expect(readings).toEqual([{ fps: 4, gpuMilliseconds: null }]);
+  });
 });

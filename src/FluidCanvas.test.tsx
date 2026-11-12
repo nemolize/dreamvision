@@ -778,6 +778,11 @@ describe("FluidCanvas settings", () => {
 });
 
 describe("FluidCanvas frame stats", () => {
+  // A fractional clock makes five 100 ms steps sum to just under 500 ms.
+  beforeEach(() => {
+    vi.spyOn(performance, "now").mockReturnValue(0);
+  });
+
   const toggleStats = (): void => {
     openPanel();
     fireEvent.click(screen.getByRole("checkbox", { name: "Frame stats" }));
@@ -843,6 +848,23 @@ describe("FluidCanvas frame stats", () => {
     advance(6, 100);
 
     expect(readout()).toBe("– fps · – ms");
+  });
+
+  it("opens a fresh window when a hidden tab returns, instead of averaging over the gap", async () => {
+    await mount();
+    toggleStats();
+    advance(6, 100);
+    expect(readout()).toBe("10 fps · – ms");
+
+    act(() => {
+      setDocumentHidden(true);
+      setDocumentHidden(false);
+    });
+    advance(1, 60_000);
+    expect(readout()).toBe("10 fps · – ms");
+
+    advance(5, 100);
+    expect(readout()).toBe("10 fps · – ms");
   });
 
   it("hides the readout and stops the timing when switched off", async () => {
