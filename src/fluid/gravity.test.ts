@@ -56,13 +56,11 @@ describe("easeDirection", () => {
     expect(easeDirection([0, -1], [1, 0], -1)).toStrictEqual([0, -1]);
   });
 
-  it("closes the share of the gap one time constant implies", () => {
-    const [x] = easeDirection([0, -1], [1, 0], GRAVITY_SMOOTHING_SECONDS);
-    const [unnormalisedX, unnormalisedY] = [1 - Math.exp(-1), -Math.exp(-1)];
-    expect(x).toBeCloseTo(
-      unnormalisedX / Math.hypot(unnormalisedX, unnormalisedY),
-      6,
-    );
+  it("closes the share of the turn one time constant implies", () => {
+    const [x, y] = easeDirection([0, -1], [1, 0], GRAVITY_SMOOTHING_SECONDS);
+    const turned = (Math.PI / 2) * (1 - Math.exp(-1));
+    expect(x).toBeCloseTo(Math.sin(turned), 9);
+    expect(y).toBeCloseTo(-Math.cos(turned), 9);
   });
 
   it("converges onto the target", () => {
@@ -74,10 +72,27 @@ describe("easeDirection", () => {
     expect(Math.hypot(x, y)).toBeCloseTo(1, 6);
   });
 
-  it("snaps to the target on a half turn, which has no direction between", () => {
-    expect(
-      easeDirection([0, -1], [0, 1], Math.log(2) * GRAVITY_SMOOTHING_SECONDS),
-    ).toStrictEqual([0, 1]);
+  it("turns a target exactly opposite, at the step a real frame takes", () => {
+    let direction: readonly [number, number] = [0, -1];
+    const [, firstY] = easeDirection(direction, [0, 1], 1 / 60);
+    expect(firstY).toBeGreaterThan(-1);
+
+    for (let frame = 0; frame < 600; frame++) {
+      direction = easeDirection(direction, [0, 1], 1 / 60);
+    }
+    expect(direction).toEqual(close(0, 1));
+  });
+
+  it("turns the same way round from either side of an opposite target", () => {
+    const [x] = easeDirection([0, -1], [0, 1], 1 / 60);
+    const [mirrored] = easeDirection([0, 1], [0, -1], 1 / 60);
+    expect(Math.abs(x)).toBeCloseTo(Math.abs(mirrored), 9);
+    expect(x).not.toBe(0);
+  });
+
+  it("takes the shorter way round to a near-opposite target", () => {
+    const [x] = easeDirection([0, -1], [-0.05, Math.sqrt(1 - 0.0025)], 1 / 60);
+    expect(x).toBeLessThan(0);
   });
 });
 

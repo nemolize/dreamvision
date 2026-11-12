@@ -28,17 +28,24 @@ export const upFromReading = (
   return [right / tilt, -above / tilt];
 };
 
-/** A half turn passes through zero, where no direction exists: snap to the target. */
+/** Eases along the shorter arc, so a target opposite `current` still turns. */
 export const easeDirection = (
   current: Direction,
   target: Direction,
   dt: number,
 ): Direction => {
   const blend = 1 - Math.exp(-Math.max(dt, 0) / GRAVITY_SMOOTHING_SECONDS);
-  const x = current[0] + (target[0] - current[0]) * blend;
-  const y = current[1] + (target[1] - current[1]) * blend;
-  const length = Math.hypot(x, y);
-  return length < 1e-6 ? target : [x / length, y / length];
+  if (blend === 0) return current;
+  const from = Math.atan2(current[1], current[0]);
+  const gap = Math.atan2(
+    current[0] * target[1] - current[1] * target[0],
+    current[0] * target[0] + current[1] * target[1],
+  );
+  // Exactly opposite has no shorter arc; either way round, take the same one.
+  const turn = Math.abs(gap) === Math.PI ? Math.PI : gap;
+  if (turn === 0) return current;
+  const angle = from + turn * blend;
+  return [Math.cos(angle), Math.sin(angle)];
 };
 
 export class GravityTracker {

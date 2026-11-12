@@ -562,7 +562,7 @@ describe("FluidCanvas frame loop", () => {
     expect(Math.abs(y)).toBeLessThan(0.1);
   });
 
-  it("asks for motion access on the first press only", async () => {
+  it("asks for motion access on the first release only, never on a press or a cancel", async () => {
     const requestPermission = vi.fn().mockResolvedValue("granted");
     vi.stubGlobal(
       "DeviceMotionEvent",
@@ -571,10 +571,14 @@ describe("FluidCanvas frame loop", () => {
     await mount();
     const canvas = getCanvas();
 
-    expect(requestPermission).not.toHaveBeenCalled();
     fireEvent.pointerDown(canvas, { pointerId: 1, clientX: 10, clientY: 10 });
-    fireEvent.pointerUp(canvas, { pointerId: 1 });
+    fireEvent.pointerCancel(canvas, { pointerId: 1 });
+    expect(requestPermission).not.toHaveBeenCalled();
+
     fireEvent.pointerDown(canvas, { pointerId: 1, clientX: 20, clientY: 20 });
+    fireEvent.pointerUp(canvas, { pointerId: 1 });
+    fireEvent.pointerDown(canvas, { pointerId: 1, clientX: 30, clientY: 30 });
+    fireEvent.pointerUp(canvas, { pointerId: 1 });
 
     expect(requestPermission).toHaveBeenCalledOnce();
   });

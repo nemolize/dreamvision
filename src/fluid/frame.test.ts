@@ -24,7 +24,7 @@ const faces = (name: string): readonly [string, string] => [
   `${name}:1`,
 ];
 
-const encode = (vorticityConfinement: number): Call[] => {
+const encode = (vorticityConfinement: number, buoyancy = 0): Call[] => {
   const calls: Call[] = [];
   let group = "";
   let pipeline = "";
@@ -64,6 +64,7 @@ const encode = (vorticityConfinement: number): Call[] => {
       "advect",
       "curl",
       "confine",
+      "buoyancy",
       "divergence",
       "pressure",
       "gradientSubtract",
@@ -83,6 +84,7 @@ const encode = (vorticityConfinement: number): Call[] => {
     splatDye: faces("splatDye"),
     curlPass: faces("curlPass"),
     confinePass: faces("confinePass"),
+    buoyancyPass: [faces("buoyancyPass:0"), faces("buoyancyPass:1")],
     divergencePass: faces("divergencePass"),
     pressurePass: faces("pressurePass"),
     gradientPass: [faces("gradientPass:0"), faces("gradientPass:1")],
@@ -100,6 +102,7 @@ const encode = (vorticityConfinement: number): Call[] => {
     splatSlotBytes: 256,
     pressureIterations: 1,
     vorticityConfinement,
+    buoyancy,
   };
   if (!isFrameEncode(frame)) throw new Error("unreachable");
   encodeFrame(frame);
@@ -136,5 +139,37 @@ describe("encodeFrame's vorticity confinement", () => {
       "advect",
     ]);
     expect(calls[1]).toStrictEqual(["divergence", "divergencePass:1"]);
+  });
+});
+
+describe("encodeFrame's buoyancy", () => {
+  it("lifts after the confinement and before the projection, reading velocity face then dye face", () => {
+    const calls = encode(10, 10);
+
+    expect(calls.map(([pipeline]) => pipeline)).toStrictEqual([
+      "advect",
+      "curl",
+      "confine",
+      "buoyancy",
+      "divergence",
+      "pressure",
+      "gradientSubtract",
+      "advect",
+    ]);
+    expect(calls[3]).toStrictEqual(["buoyancy", "buoyancyPass:0:0"]);
+    expect(calls[4]).toStrictEqual(["divergence", "divergencePass:1"]);
+  });
+
+  it("swaps the velocity face, so the projection reads what the lift wrote", () => {
+    const calls = encode(0, 10);
+
+    expect(calls[1]).toStrictEqual(["buoyancy", "buoyancyPass:1:0"]);
+    expect(calls[2]).toStrictEqual(["divergence", "divergencePass:0"]);
+  });
+
+  it("runs no pass at strength 0", () => {
+    expect(encode(0, 0).map(([pipeline]) => pipeline)).not.toContain(
+      "buoyancy",
+    );
   });
 });

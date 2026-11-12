@@ -121,7 +121,6 @@ export const FluidCanvas = () => {
     const onPointerDown = (event: PointerEvent): void => {
       const [x, y] = toNormalised(event);
       motion.requestMotion();
-      void gravityWatch.requestPermission();
       pointer.press(event.pointerId, x, y);
       canvas.setPointerCapture(event.pointerId);
     };
@@ -130,6 +129,8 @@ export const FluidCanvas = () => {
       pointer.move(event.pointerId, x, y);
     };
     const onPointerUp = (event: PointerEvent): void => {
+      // A touch press is no user activation to iOS Safari; its release is.
+      if (event.type === "pointerup") void gravityWatch.requestPermission();
       pointer.release(event.pointerId);
       if (canvas.hasPointerCapture(event.pointerId)) {
         canvas.releasePointerCapture(event.pointerId);

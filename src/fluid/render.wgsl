@@ -2,6 +2,9 @@
 
 @group(0) @binding(0) var dye: texture_2d<f32>;
 
+/// Brightness gained per unit of heat. Chosen empirically, no fixed source.
+const HEAT_GLOW: f32 = 4.0;
+
 struct VertexOutput {
   @builtin(position) position: vec4f,
   @location(0) uv: vec2f,
@@ -19,13 +22,14 @@ fn vertexMain(@builtin(vertex_index) index: u32) -> VertexOutput {
   return out;
 }
 
-fn loadDye(cell: vec2i, maxCell: vec2i) -> vec3f {
-  return textureLoad(dye, clamp(cell, vec2i(0, 0), maxCell), 0).rgb;
+/// Colour in `.rgb`, heat in `.a`.
+fn loadDye(cell: vec2i, maxCell: vec2i) -> vec4f {
+  return textureLoad(dye, clamp(cell, vec2i(0, 0), maxCell), 0);
 }
 
 /// Bilinear fetch, by hand: the dye texture is `rgba32float`, which storage
 /// access requires and which is not filterable by a sampler.
-fn sampleDye(uv: vec2f) -> vec3f {
+fn sampleDye(uv: vec2f) -> vec4f {
   let size = vec2f(textureDimensions(dye));
   let cell = uv * size - 0.5;
   let base = floor(cell);
@@ -43,7 +47,9 @@ fn sampleDye(uv: vec2f) -> vec3f {
 
 @fragment
 fn fragmentMain(in: VertexOutput) -> @location(0) vec4f {
-  let colour = sampleDye(in.uv);
+  let sampled = sampleDye(in.uv);
+  // Hot regions glow: heat brightens the colour it rides on.
+  let colour = sampled.rgb * (1.0 + HEAT_GLOW * sampled.a);
   // The dye field is unbounded, so map it through a saturating curve rather
   // than clipping — bright cores keep their hue instead of going white. The
   // exponent lifts the mid-tones the plain curve leaves muddy.
