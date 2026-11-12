@@ -6,9 +6,14 @@ const READING = /^(\d+|–) fps · (\d+\.\d|–) ms$/;
 
 declare global {
   interface Window {
-    mapGate: { armed: boolean; held: boolean; release: () => void };
+    mapGate: {
+      armed: boolean;
+      held: boolean;
+      release: () => void;
+      settled: "resolved" | "rejected" | null;
+      settledAt: number;
+    };
     readings: string[];
-    releasedAt: number;
   }
 }
 
@@ -47,7 +52,13 @@ test.describe("frame stats readout", () => {
     await page.addInitScript(() => {
       const original: unknown = Reflect.get(GPUBuffer.prototype, "mapAsync");
       if (typeof original !== "function") throw new Error("no mapAsync");
-      const gate = { armed: false, held: false, release: () => undefined };
+      const gate: Window["mapGate"] = {
+        armed: false,
+        held: false,
+        release: () => undefined,
+        settled: null,
+        settledAt: 0,
+      };
       window.mapGate = gate;
       Object.defineProperty(GPUBuffer.prototype, "mapAsync", {
         value(this: GPUBuffer, ...args: unknown[]): unknown {
@@ -57,7 +68,20 @@ test.describe("frame stats readout", () => {
           return new Promise((resolve, reject) => {
             gate.release = () => {
               const run: unknown = Reflect.apply(original, this, args);
-              Promise.resolve(run).then(resolve, reject);
+              Promise.resolve(run).then(
+                (value) => {
+                  gate.settled = "resolved";
+                  gate.settledAt = performance.now();
+                  resolve(value);
+                },
+                (error: unknown) => {
+                  gate.settled = "rejected";
+                  gate.settledAt = performance.now();
+                  reject(
+                    error instanceof Error ? error : new Error(String(error)),
+                  );
+                },
+              );
             };
           });
         },
@@ -94,13 +118,17 @@ test.describe("frame stats readout", () => {
         childList: true,
         characterData: true,
       });
-      window.releasedAt = performance.now();
       window.mapGate.release();
     });
+    // Counted from when the held readback settled, so a slow one still gets
+    // its windows; a rejected one would otherwise read as a dropped sample.
     await page.waitForFunction(
-      (waitMs) => performance.now() - window.releasedAt >= waitMs,
+      (waitMs) =>
+        window.mapGate.settled !== null &&
+        performance.now() - window.mapGate.settledAt >= waitMs,
       3 * STATS_WINDOW_MS,
     );
+    expect(await page.evaluate(() => window.mapGate.settled)).toBe("resolved");
 
     const readings = await page.evaluate(() => window.readings);
     expect(readings.filter((text) => /\d\.\d ms$/.test(text))).toEqual([]);
