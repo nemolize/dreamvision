@@ -67,3 +67,7 @@ export const SEED_DYE_GAIN = 8;
 /** Workgroup edge length; 8x8 = 64 invocations, a safe fit everywhere. The
  * renderer substitutes it into the shader source, so this is the only copy. */
 export const WORKGROUP_SIZE = 8;
+
+/** Span the frame-stats readout averages over before it shows a new reading.
+ * Chosen empirically, no fixed source. */
+export const STATS_WINDOW_MS = 500;

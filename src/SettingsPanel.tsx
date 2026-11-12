@@ -136,6 +136,14 @@ export const SettingsPanel = ({
             }}
           />
 
+          <ToggleRow
+            label="Frame stats"
+            checked={settings.showStats}
+            onChange={(showStats) => {
+              onChange({ ...settings, showStats });
+            }}
+          />
+
           {RESOLUTION_DESCRIPTORS.map((descriptor) => (
             <SliderRow
               key={descriptor.key}

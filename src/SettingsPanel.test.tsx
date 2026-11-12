@@ -124,6 +124,21 @@ describe("SettingsPanel", () => {
     });
   });
 
+  it("reports the frame-stats toggle as a whole settings object, off until ticked", async () => {
+    const onChange = changeSpy();
+    renderPanel({ onChange });
+    await open();
+    const toggle = screen.getByRole("checkbox", { name: "Frame stats" });
+    expect(toggle).toHaveProperty("checked", false);
+
+    await userEvent.click(toggle);
+
+    expect(lastReported(onChange)).toEqual({
+      ...DEFAULT_SETTINGS,
+      showStats: true,
+    });
+  });
+
   it("hands the reset decision to its parent", async () => {
     const onReset = vi.fn();
     const onChange = changeSpy();

@@ -20,5 +20,8 @@ export interface FluidRenderer {
   applySettings: (settings: FluidSettings) => void;
   setResolution: (resolution: ResolutionSettings) => void;
   resize: (width: number, height: number) => void;
+  /** A listener starts reporting each frame's GPU milliseconds; `null` stops
+   * it. A device without `timestamp-query` reports nothing. */
+  measureGpu: (listener: ((milliseconds: number) => void) | null) => void;
   destroy: () => void;
 }

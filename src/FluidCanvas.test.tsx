@@ -62,6 +62,7 @@ const fakeRenderer = (): FluidRenderer => ({
   applySettings: vi.fn(),
   setResolution: vi.fn(),
   resize: vi.fn(),
+  measureGpu: vi.fn(),
   destroy: vi.fn(),
 });
 
@@ -773,5 +774,112 @@ describe("FluidCanvas settings", () => {
     expect(renderer.applySettings).toHaveBeenLastCalledWith(DEFAULT_SETTINGS);
     expect(renderer.setResolution).toHaveBeenLastCalledWith(DEFAULT_RESOLUTION);
     expect(loadResolution()).toEqual(DEFAULT_RESOLUTION);
+  });
+});
+
+describe("FluidCanvas frame stats", () => {
+  const toggleStats = (): void => {
+    openPanel();
+    fireEvent.click(screen.getByRole("checkbox", { name: "Frame stats" }));
+  };
+
+  const advance = (frameCount: number, milliseconds: number): void => {
+    for (let frame = 0; frame < frameCount; frame++) {
+      act(() => {
+        runFrame(milliseconds);
+      });
+    }
+  };
+
+  const readout = (): string | undefined =>
+    document.querySelector(".frame-stats")?.textContent;
+
+  it("shows no readout and measures nothing by default", async () => {
+    await mount();
+
+    advance(10, 100);
+
+    expect(readout()).toBeUndefined();
+    expect(onlyRenderer().measureGpu).not.toHaveBeenCalled();
+  });
+
+  it("shows a placeholder at once, then each window's average frame rate", async () => {
+    await mount();
+    toggleStats();
+    expect(readout()).toBe("– fps · – ms");
+
+    advance(6, 100);
+
+    expect(readout()).toBe("10 fps · – ms");
+  });
+
+  it("shows the GPU time the renderer reports, to a tenth of a millisecond", async () => {
+    await mount();
+    const reported: { listener: ((milliseconds: number) => void) | null } = {
+      listener: null,
+    };
+    vi.mocked(onlyRenderer().measureGpu).mockImplementation((listener) => {
+      reported.listener = listener;
+    });
+    toggleStats();
+    advance(1, 100);
+
+    reported.listener?.(2.2);
+    reported.listener?.(2.6);
+    advance(5, 100);
+
+    expect(readout()).toBe("10 fps · 2.4 ms");
+  });
+
+  it("reads a window with no drawn frame as empty", async () => {
+    await mount();
+    toggleStats();
+    advance(6, 100);
+    expect(readout()).toBe("10 fps · – ms");
+
+    act(() => {
+      setDocumentHidden(true);
+    });
+    advance(6, 100);
+
+    expect(readout()).toBe("– fps · – ms");
+  });
+
+  it("hides the readout and stops the timing when switched off", async () => {
+    await mount();
+    toggleStats();
+    advance(6, 100);
+
+    fireEvent.click(screen.getByRole("checkbox", { name: "Frame stats" }));
+    advance(1, 100);
+
+    expect(readout()).toBeUndefined();
+    expect(onlyRenderer().measureGpu).toHaveBeenLastCalledWith(null);
+  });
+
+  it("keeps the readout with the panel closed", async () => {
+    await mount();
+    toggleStats();
+    fireEvent.click(screen.getByRole("button", { name: "Close settings" }));
+
+    expect(screen.queryByRole("checkbox", { name: "Frame stats" })).toBeNull();
+    expect(readout()).toBe("– fps · – ms");
+  });
+
+  it("opens switched on when the stored settings say so, and Reset turns it off", async () => {
+    window.localStorage.setItem(
+      "dreamvision.settings",
+      JSON.stringify({ showStats: true }),
+    );
+    await mount();
+    expect(readout()).toBe("– fps · – ms");
+
+    openPanel();
+    fireEvent.click(screen.getByRole("button", { name: "Reset" }));
+
+    expect(readout()).toBeUndefined();
+    expect(onlyRenderer().applySettings).toHaveBeenLastCalledWith(
+      DEFAULT_SETTINGS,
+    );
   });
 });

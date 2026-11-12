@@ -15,6 +15,7 @@ const fakeRenderer = (): FluidRenderer => ({
   applySettings: vi.fn(),
   setResolution: vi.fn(),
   resize: vi.fn(),
+  measureGpu: vi.fn(),
   destroy: vi.fn(),
 });
 

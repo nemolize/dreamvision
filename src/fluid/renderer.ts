@@ -1,6 +1,7 @@
 import { MAX_SPLATS_PER_FRAME } from "./config";
 import type { DoubleBuffer } from "./doubleBuffer";
 import { encodeFrame } from "./frame";
+import { createGpuTimer } from "./gpuTimer";
 import type { Direction } from "./gravity";
 import type { Grid } from "./grid";
 import { fitGrids, needsRebuild } from "./grid";
@@ -71,6 +72,9 @@ export const createFluidRenderer = (
     pipelines.simulationModule,
     pipelines.sharedLayout,
   );
+
+  const timer = createGpuTimer(device);
+  let onGpuTime: ((milliseconds: number) => void) | null = null;
 
   let resources: Resources | null = null;
   let settings: FluidSettings = DEFAULT_SETTINGS;
@@ -192,6 +196,7 @@ export const createFluidRenderer = (
       );
     });
 
+    const timing = onGpuTime === null ? null : (timer?.begin() ?? null);
     encodeFrame({
       device,
       context,
@@ -204,7 +209,18 @@ export const createFluidRenderer = (
       pressureIterations: settings.pressureIterations,
       vorticityConfinement: settings.vorticityConfinement,
       buoyancy: settings.buoyancy,
+      timing,
     });
+
+    // A failed readback costs this frame's sample, never the frame.
+    if (timing !== null) {
+      void timer?.read().then(
+        (milliseconds) => {
+          onGpuTime?.(milliseconds);
+        },
+        () => undefined,
+      );
+    }
   };
 
   return {
@@ -212,7 +228,11 @@ export const createFluidRenderer = (
     applySettings,
     setResolution,
     resize,
+    measureGpu: (listener) => {
+      onGpuTime = listener;
+    },
     destroy: () => {
+      timer?.destroy();
       if (resources !== null) releaseResources(resources);
       resources = null;
       resampler.destroy();

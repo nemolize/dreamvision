@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { FrameEncode } from "./frame";
 import { encodeFrame } from "./frame";
+import type { FrameTiming } from "./gpuTimer";
 
 type Call = readonly [pipeline: string, group: string];
 
@@ -18,13 +19,25 @@ const fakeBuffer = () => {
 };
 
 const isFrameEncode = (_value: unknown): _value is FrameEncode => true;
+const isQuerySet = (_value: unknown): _value is GPUQuerySet => true;
 
 const faces = (name: string): readonly [string, string] => [
   `${name}:0`,
   `${name}:1`,
 ];
 
-const encode = (vorticityConfinement: number, buoyancy = 0): Call[] => {
+interface Trace {
+  computeDescriptors: unknown[];
+  renderDescriptors: Record<string, unknown>[];
+  order: string[];
+}
+
+const encode = (
+  vorticityConfinement: number,
+  buoyancy = 0,
+  timing: FrameTiming | null = null,
+  trace: Trace = { computeDescriptors: [], renderDescriptors: [], order: [] },
+): Call[] => {
   const calls: Call[] = [];
   let group = "";
   let pipeline = "";
@@ -48,11 +61,24 @@ const encode = (vorticityConfinement: number, buoyancy = 0): Call[] => {
   };
   const device = {
     createCommandEncoder: () => ({
-      beginComputePass: () => pass,
-      beginRenderPass: () => display,
-      finish: () => "commands",
+      beginComputePass: (descriptor: unknown) => {
+        trace.computeDescriptors.push(descriptor);
+        return pass;
+      },
+      beginRenderPass: (descriptor: Record<string, unknown>) => {
+        trace.renderDescriptors.push(descriptor);
+        return display;
+      },
+      finish: () => {
+        trace.order.push("finish");
+        return "commands";
+      },
     }),
-    queue: { submit: () => undefined },
+    queue: {
+      submit: () => {
+        trace.order.push("submit");
+      },
+    },
   };
   const context = {
     getCurrentTexture: () => ({ createView: () => "view" }),
@@ -103,6 +129,7 @@ const encode = (vorticityConfinement: number, buoyancy = 0): Call[] => {
     pressureIterations: 1,
     vorticityConfinement,
     buoyancy,
+    timing,
   };
   if (!isFrameEncode(frame)) throw new Error("unreachable");
   encodeFrame(frame);
@@ -171,5 +198,62 @@ describe("encodeFrame's buoyancy", () => {
     expect(encode(0, 0).map(([pipeline]) => pipeline)).not.toContain(
       "buoyancy",
     );
+  });
+});
+
+describe("encodeFrame's GPU timing", () => {
+  const timing = (order: string[]): FrameTiming => {
+    const querySet = "set";
+    if (!isQuerySet(querySet)) throw new Error("unreachable");
+    return {
+      computeWrites: { querySet, beginningOfPassWriteIndex: 0 },
+      renderWrites: { querySet, endOfPassWriteIndex: 1 },
+      resolve: () => {
+        order.push("resolve");
+      },
+    };
+  };
+
+  it("brackets the frame: the first slot opens the compute pass, the second closes the display pass", () => {
+    const trace: Trace = {
+      computeDescriptors: [],
+      renderDescriptors: [],
+      order: [],
+    };
+    encode(0, 0, timing(trace.order), trace);
+
+    expect(trace.computeDescriptors).toStrictEqual([
+      {
+        timestampWrites: { querySet: "set", beginningOfPassWriteIndex: 0 },
+      },
+    ]);
+    expect(trace.renderDescriptors[0]?.["timestampWrites"]).toStrictEqual({
+      querySet: "set",
+      endOfPassWriteIndex: 1,
+    });
+  });
+
+  it("resolves the timestamps into the same submit, after the passes and before the encoder finishes", () => {
+    const trace: Trace = {
+      computeDescriptors: [],
+      renderDescriptors: [],
+      order: [],
+    };
+    encode(0, 0, timing(trace.order), trace);
+
+    expect(trace.order).toStrictEqual(["resolve", "finish", "submit"]);
+  });
+
+  it("writes no timestamp when the frame is not timed", () => {
+    const trace: Trace = {
+      computeDescriptors: [],
+      renderDescriptors: [],
+      order: [],
+    };
+    encode(0, 0, null, trace);
+
+    expect(trace.computeDescriptors).toStrictEqual([undefined]);
+    expect(trace.renderDescriptors[0]).not.toHaveProperty("timestampWrites");
+    expect(trace.order).toStrictEqual(["finish", "submit"]);
   });
 });
