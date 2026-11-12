@@ -25,7 +25,8 @@ export const DYE_DISSIPATION = 0.1;
  * added per second, per unit of curl. 0 switches the pass off. */
 export const VORTICITY_CONFINEMENT = 10;
 
-/** Cells per second squared of lift per unit of heat; 0 switches the pass off. */
+/** Cells per second squared of lift per unit of heat at Earth's gravity; 0
+ * switches the pass off. */
 export const BUOYANCY_STRENGTH = 10;
 
 export const EARTH_GRAVITY = 9.8;
