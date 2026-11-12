@@ -25,6 +25,19 @@ export const DYE_DISSIPATION = 0.1;
  * added per second, per unit of curl. 0 switches the pass off. */
 export const VORTICITY_CONFINEMENT = 10;
 
+/** Cells per second squared of lift per unit of heat; 0 switches the pass off. */
+export const BUOYANCY_STRENGTH = 10;
+
+export const HEAT_COOLING = 1;
+
+export const HEAT_PER_DYE = 0.2;
+
+/** Screen-plane magnitude in m/s² below which a reading has no usable direction. Chosen empirically. */
+export const GRAVITY_MIN_TILT = 1;
+
+/** Time constant of the low-pass on the gravity direction. Chosen empirically. */
+export const GRAVITY_SMOOTHING_SECONDS = 0.15;
+
 /** Divides squared distance in `exp(-d² / r)`, so it is a squared length, not
  * a radius. */
 export const SPLAT_RADIUS = 0.0005;

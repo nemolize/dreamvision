@@ -64,6 +64,28 @@ describe("normaliseSettings", () => {
     expect(clampSetting("vorticityConfinement", 1e6)).toBe(50);
   });
 
+  it("lets the buoyancy strength reach zero, which switches the pass off", () => {
+    expect(clampSetting("buoyancy", 0)).toBe(0);
+    expect(clampSetting("buoyancy", -3)).toBe(0);
+    expect(clampSetting("buoyancy", 1e6)).toBe(100);
+  });
+
+  it("keeps the cooling rate above zero, so heat always decays", () => {
+    expect(clampSetting("heatCooling", 0)).toBeGreaterThan(0);
+    expect(clampSetting("heatCooling", -1)).toBeGreaterThan(0);
+  });
+
+  it("keeps a stored buoyancy and cooling rate, and defaults a blob that predates them", () => {
+    expect(normaliseSettings({ buoyancy: 40, heatCooling: 2 })).toMatchObject({
+      buoyancy: 40,
+      heatCooling: 2,
+    });
+    expect(normaliseSettings({ splatForce: 50 })).toMatchObject({
+      buoyancy: DEFAULT_SETTINGS.buoyancy,
+      heatCooling: DEFAULT_SETTINGS.heatCooling,
+    });
+  });
+
   it("clamps an out-of-range stored value", () => {
     expect(normaliseSettings({ pressureIterations: 1000 })).toMatchObject({
       pressureIterations: 64,

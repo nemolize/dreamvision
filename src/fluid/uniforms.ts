@@ -1,3 +1,4 @@
+import { HEAT_PER_DYE } from "./config";
 import type { Grid } from "./grid";
 import type { ProjectionScale } from "./projection";
 import { projectionUniform } from "./projection";
@@ -12,9 +13,11 @@ export const UNIFORM = {
   toStored: 6,
   wrapEdges: 8,
   vorticity: 9,
+  buoyancy: 10,
+  up: 12,
 } as const;
 
-export const UNIFORM_FLOATS = 12;
+export const UNIFORM_FLOATS = 16;
 export const UNIFORM_BYTES = UNIFORM_FLOATS * 4;
 
 /** Float index of each `SplatUniforms` member in `simulation.wgsl` — WGSL
@@ -25,6 +28,7 @@ export const SPLAT_UNIFORM = {
   delta: 2,
   color: 4,
   radius: 8,
+  heat: 9,
 } as const;
 
 export const SPLAT_UNIFORM_FLOATS = 12;
@@ -34,6 +38,7 @@ export const SPLAT_UNIFORM_BYTES = SPLAT_UNIFORM_FLOATS * 4;
 export const ADVECT_PARAM = {
   gridSize: 0,
   dissipation: 2,
+  heatDissipation: 3,
 } as const;
 
 /** One `vec4f` — the size every pass-parameter buffer is allocated at. */
@@ -50,6 +55,8 @@ export const packUniforms = (
   dt: number,
   wrapEdges: boolean,
   vorticity: number,
+  buoyancy: number,
+  up: readonly [number, number],
 ): void => {
   target.set([simGrid.width, simGrid.height], UNIFORM.simSize);
   target[UNIFORM.dt] = dt;
@@ -59,6 +66,8 @@ export const packUniforms = (
   target.set(metric.toStored, UNIFORM.toStored);
   target[UNIFORM.wrapEdges] = wrapEdges ? 1 : 0;
   target[UNIFORM.vorticity] = vorticity;
+  target[UNIFORM.buoyancy] = buoyancy;
+  target.set(up, UNIFORM.up);
 };
 
 export const packSplatUniforms = (
@@ -70,14 +79,17 @@ export const packSplatUniforms = (
   target.set([splat.dx, splat.dy], SPLAT_UNIFORM.delta);
   target.set(splat.color, SPLAT_UNIFORM.color);
   target[SPLAT_UNIFORM.radius] = radius;
+  target[SPLAT_UNIFORM.heat] = HEAT_PER_DYE * Math.max(...splat.color);
 };
 
 export const packAdvectParams = (
   grid: Grid,
   dissipation: number,
+  heatDissipation = dissipation,
 ): Float32Array => {
   const values = new Float32Array(PARAM_FLOATS);
   values.set([grid.width, grid.height], ADVECT_PARAM.gridSize);
   values[ADVECT_PARAM.dissipation] = dissipation;
+  values[ADVECT_PARAM.heatDissipation] = heatDissipation;
   return values;
 };

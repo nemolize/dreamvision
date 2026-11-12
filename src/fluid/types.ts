@@ -1,3 +1,4 @@
+import type { Direction } from "./gravity";
 import type { ResolutionSettings } from "./resolution";
 import type { FluidSettings } from "./settings";
 
@@ -15,7 +16,7 @@ export interface Splat {
 export interface FluidRenderer {
   /** Advance by `dt` seconds and draw one frame, injecting each splat before
    * the projection. */
-  frame: (splats: readonly Splat[], dt: number) => void;
+  frame: (splats: readonly Splat[], dt: number, up: Direction) => void;
   applySettings: (settings: FluidSettings) => void;
   setResolution: (resolution: ResolutionSettings) => void;
   resize: (width: number, height: number) => void;

@@ -53,7 +53,7 @@ test.describe("fluid canvas", () => {
     await page.getByRole("button", { name: "Open settings" }).click();
 
     await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
-    await expect(page.getByRole("slider")).toHaveCount(8);
+    await expect(page.getByRole("slider")).toHaveCount(10);
   });
 
   test("restores a changed setting after a reload, and drops it on reset", async ({
@@ -415,6 +415,38 @@ test.describe("fluid canvas", () => {
     // 10 is chosen empirically, no fixed source.
     expect(walled).toBeLessThan(1);
     expect(wrapped).toBeGreaterThan(10);
+  });
+
+  test("lifts hot dye toward the top of the screen only when buoyancy is above zero", async ({
+    page,
+  }) => {
+    test.setTimeout(180_000);
+
+    const upwardShare = async (buoyancy: string): Promise<number> => {
+      await freshPage(page, "/?seed=off");
+
+      await page.getByRole("button", { name: "Open settings" }).click();
+      await settleSlider(page, "Buoyancy", buoyancy);
+      await settleSlider(page, "Vorticity", "0");
+      await cheapenGrids(page);
+      await hideSettings(page);
+
+      await stir(page, page.viewportSize() ?? { width: 1280, height: 720 });
+      await waitFrames(page, 45);
+
+      const pixels = await sampleCanvas(page);
+      const half = Math.floor(pixels.length / 2);
+      const upper = pixels.slice(0, half).reduce((sum, v) => sum + v, 0);
+      const lower = pixels.slice(half).reduce((sum, v) => sum + v, 0);
+      expect(upper + lower).toBeGreaterThan(0);
+      return (upper - lower) / (upper + lower);
+    };
+
+    const still = await upwardShare("0");
+    const lifted = await upwardShare("100");
+
+    // 0.05 is chosen empirically, no fixed source.
+    expect(lifted - still).toBeGreaterThan(0.05);
   });
 
   test("paints the seed burst before any input", async ({ page }) => {

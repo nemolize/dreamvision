@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { HEAT_PER_DYE } from "./config";
 import { projectionScale } from "./projection";
 import simulationShaderSource from "./simulation.wgsl?raw";
 import type { Splat } from "./types";
@@ -89,12 +90,18 @@ describe("UNIFORM", () => {
   });
 
   it("is sized to hold the struct", () => {
-    expect(UNIFORM_FLOATS).toBeGreaterThanOrEqual(UNIFORM.toStored + vec2f);
+    expect(UNIFORM_FLOATS).toBeGreaterThanOrEqual(UNIFORM.up + vec2f);
+    expect(UNIFORM_FLOATS % vec4f).toBe(0);
   });
 });
 
 describe("packUniforms", () => {
-  const pack = (wrapEdges = false, vorticity = 0): Float32Array => {
+  const pack = (
+    wrapEdges = false,
+    vorticity = 0,
+    buoyancy = 0,
+    up: readonly [number, number] = [0, -1],
+  ): Float32Array => {
     const target = new Float32Array(UNIFORM_FLOATS);
     packUniforms(
       target,
@@ -104,6 +111,8 @@ describe("packUniforms", () => {
       1 / 60,
       wrapEdges,
       vorticity,
+      buoyancy,
+      up,
     );
     return target;
   };
@@ -115,6 +124,16 @@ describe("packUniforms", () => {
 
   it("writes the confinement strength into its own member", () => {
     expect(pack(false, 37)[UNIFORM.vorticity]).toBe(37);
+  });
+
+  it("writes the buoyancy strength into its own member", () => {
+    expect(pack(false, 0, 23)[UNIFORM.buoyancy]).toBe(23);
+  });
+
+  it("writes the up direction as an x, y pair", () => {
+    const packed = pack(false, 0, 0, [0.6, -0.8]);
+    expect(packed[UNIFORM.up]).toBeCloseTo(0.6, 6);
+    expect(packed[UNIFORM.up + 1]).toBeCloseTo(-0.8, 6);
   });
 
   it("writes the simulation grid, not the dye grid, into simSize", () => {
@@ -153,6 +172,8 @@ describe("packUniforms", () => {
       1,
       true,
       1,
+      1,
+      [0, -1],
     );
     for (const offset of Object.values(UNIFORM)) {
       expect(target[offset]).not.toBeNaN();
@@ -217,6 +238,10 @@ describe("packSplatUniforms", () => {
 
   /** The renderer reuses one array across a frame's splats, so a member the
    * packer skipped would carry the previous splat's value into this one. */
+  it("adds heat in proportion to the brightest colour channel", () => {
+    expect(pack()[SPLAT_UNIFORM.heat]).toBeCloseTo(HEAT_PER_DYE * 0.5, 6);
+  });
+
   it("overwrites every member rather than leaving a stale one", () => {
     const stale = 9;
     const target = new Float32Array(SPLAT_UNIFORM_FLOATS).fill(stale);
@@ -233,7 +258,11 @@ describe("ADVECT_PARAM", () => {
   });
 
   it("fits the one vec4f the buffer is allocated at", () => {
-    expect(ADVECT_PARAM.dissipation).toBeLessThan(PARAM_FLOATS);
+    expect(ADVECT_PARAM.heatDissipation).toBeLessThan(PARAM_FLOATS);
+  });
+
+  it("keeps the two decays side by side, which the in-place rewrite relies on", () => {
+    expect(ADVECT_PARAM.heatDissipation).toBe(ADVECT_PARAM.dissipation + 1);
   });
 });
 
@@ -245,6 +274,16 @@ describe("packAdvectParams", () => {
       packed[ADVECT_PARAM.gridSize + 1],
     ]).toStrictEqual([320, 180]);
     expect(packed[ADVECT_PARAM.dissipation]).toBeCloseTo(0.6);
+  });
+
+  it("writes the heat decay apart from the dissipation, and equal to it when omitted", () => {
+    const grid = { width: 8, height: 8 };
+    const apart = packAdvectParams(grid, 0.6, 2);
+    expect(apart[ADVECT_PARAM.heatDissipation]).toBeCloseTo(2);
+    expect(apart[ADVECT_PARAM.dissipation]).toBeCloseTo(0.6);
+    expect(
+      packAdvectParams(grid, 0.6)[ADVECT_PARAM.heatDissipation],
+    ).toBeCloseTo(0.6);
   });
 
   /** `applySettings` rewrites dissipation in place at this byte offset, so a

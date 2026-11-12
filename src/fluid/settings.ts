@@ -1,5 +1,7 @@
 import {
+  BUOYANCY_STRENGTH,
   DYE_DISSIPATION,
+  HEAT_COOLING,
   PRESSURE_ITERATIONS,
   SPLAT_FORCE,
   SPLAT_RADIUS,
@@ -18,6 +20,8 @@ export interface NumericSettings {
   splatForce: number;
   pressureIterations: number;
   vorticityConfinement: number;
+  buoyancy: number;
+  heatCooling: number;
 }
 
 export interface FluidSettings extends NumericSettings {
@@ -31,6 +35,8 @@ const NUMERIC_DEFAULTS: NumericSettings = {
   splatForce: SPLAT_FORCE,
   pressureIterations: PRESSURE_ITERATIONS,
   vorticityConfinement: VORTICITY_CONFINEMENT,
+  buoyancy: BUOYANCY_STRENGTH,
+  heatCooling: HEAT_COOLING,
 };
 
 export const DEFAULT_SETTINGS: FluidSettings = {
@@ -88,6 +94,23 @@ export const SETTING_DESCRIPTORS: readonly SettingDescriptor<
     max: 50,
     step: 1,
     precision: 0,
+  },
+  {
+    key: "buoyancy",
+    label: "Buoyancy",
+    min: 0,
+    max: 100,
+    step: 1,
+    precision: 0,
+  },
+  // Floor above zero: heat must always decay.
+  {
+    key: "heatCooling",
+    label: "Heat cooling",
+    min: 0.05,
+    max: 5,
+    step: 0.05,
+    precision: 2,
   },
 ];
 

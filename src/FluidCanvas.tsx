@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { GpuUnavailableError, initGpu } from "@/fluid/gpu";
+import { GravityTracker } from "@/fluid/gravity";
+import { watchGravity } from "@/fluid/gravityInput";
 import { MotionGate, reducedMotionQuery } from "@/fluid/motion";
 import { PointerTracker } from "@/fluid/pointer";
 import { createFluidRenderer } from "@/fluid/renderer";
@@ -96,6 +98,8 @@ export const FluidCanvas = () => {
     if (canvas === null) return;
 
     const pointer = new PointerTracker();
+    const gravity = new GravityTracker();
+    const gravityWatch = watchGravity(window, gravity);
     pointer.setForce(settingsRef.current.splatForce);
     pointerRef.current = pointer;
     const motionQuery = reducedMotionQuery(window);
@@ -117,6 +121,7 @@ export const FluidCanvas = () => {
     const onPointerDown = (event: PointerEvent): void => {
       const [x, y] = toNormalised(event);
       motion.requestMotion();
+      void gravityWatch.requestPermission();
       pointer.press(event.pointerId, x, y);
       canvas.setPointerCapture(event.pointerId);
     };
@@ -233,7 +238,7 @@ export const FluidCanvas = () => {
 
         schedule.advance(elapsed, {
           consume: () => pointer.consume(),
-          frame: (splats, dt) => renderer?.frame(splats, dt),
+          frame: (splats, dt) => renderer?.frame(splats, dt, gravity.step(dt)),
         });
 
         frameId = requestAnimationFrame(loop);
@@ -266,6 +271,7 @@ export const FluidCanvas = () => {
       canvas.removeEventListener("pointercancel", onPointerUp);
       canvas.removeEventListener("lostpointercapture", onLostPointerCapture);
       canvas.removeEventListener("keydown", onKeyDown);
+      gravityWatch.dispose();
       document.removeEventListener("visibilitychange", onVisibilityChange);
       motionQuery?.removeEventListener?.("change", onMotionPreferenceChange);
       renderer?.destroy();

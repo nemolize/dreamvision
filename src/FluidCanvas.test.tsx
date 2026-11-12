@@ -538,6 +538,56 @@ describe("FluidCanvas frame loop", () => {
     expect(splatsOfFrame(renderer, 2)).toEqual([]);
   });
 
+  it("rises toward the top of the screen until the device reports a gravity", async () => {
+    await mount();
+
+    runFrame();
+
+    expect(vi.mocked(onlyRenderer().frame).mock.calls[0]?.[2]).toEqual([0, -1]);
+  });
+
+  it("turns the rise with the device's gravity reading", async () => {
+    await mount();
+
+    window.dispatchEvent(
+      Object.assign(new Event("devicemotion"), {
+        accelerationIncludingGravity: { x: 9.8, y: 0, z: 0 },
+      }),
+    );
+    for (let frame = 0; frame < 60; frame++) runFrame();
+
+    const calls = vi.mocked(onlyRenderer().frame).mock.calls;
+    const [x, y] = calls.at(-1)?.[2] ?? [0, 0];
+    expect(x).toBeGreaterThan(0.99);
+    expect(Math.abs(y)).toBeLessThan(0.1);
+  });
+
+  it("asks for motion access on the first press only", async () => {
+    const requestPermission = vi.fn().mockResolvedValue("granted");
+    vi.stubGlobal(
+      "DeviceMotionEvent",
+      Object.assign(vi.fn(), { requestPermission }),
+    );
+    await mount();
+    const canvas = getCanvas();
+
+    expect(requestPermission).not.toHaveBeenCalled();
+    fireEvent.pointerDown(canvas, { pointerId: 1, clientX: 10, clientY: 10 });
+    fireEvent.pointerUp(canvas, { pointerId: 1 });
+    fireEvent.pointerDown(canvas, { pointerId: 1, clientX: 20, clientY: 20 });
+
+    expect(requestPermission).toHaveBeenCalledOnce();
+  });
+
+  it("stops listening for device motion on unmount", async () => {
+    const view = await mount();
+    const remove = vi.spyOn(window, "removeEventListener");
+
+    view.unmount();
+
+    expect(remove).toHaveBeenCalledWith("devicemotion", expect.any(Function));
+  });
+
   it("does not release a capture the browser already took back", async () => {
     await mount();
     const canvas = getCanvas();

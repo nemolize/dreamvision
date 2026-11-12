@@ -42,6 +42,12 @@ describe("loadSettings", () => {
     expect(loadSettings()).toEqual(stored);
   });
 
+  it("persists the buoyancy strength and the cooling rate", () => {
+    const stored = { ...DEFAULT_SETTINGS, buoyancy: 37, heatCooling: 2.5 };
+    saveSettings(stored);
+    expect(loadSettings()).toMatchObject({ buoyancy: 37, heatCooling: 2.5 });
+  });
+
   it("falls back to the defaults on a corrupt blob", () => {
     window.localStorage.setItem(STORAGE_KEY, "{not json");
     expect(loadSettings()).toEqual(DEFAULT_SETTINGS);
