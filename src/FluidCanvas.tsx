@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { GpuUnavailableError, initGpu } from "@/fluid/gpu";
 import { GravityTracker } from "@/fluid/gravity";
@@ -6,27 +6,19 @@ import { watchGravity } from "@/fluid/gravityInput";
 import { MotionGate, reducedMotionQuery } from "@/fluid/motion";
 import { PointerTracker } from "@/fluid/pointer";
 import { createFluidRenderer } from "@/fluid/renderer";
-import type { ResolutionSettings } from "@/fluid/resolution";
 import { DEFAULT_RESOLUTION, sameResolution } from "@/fluid/resolution";
 import { FrameSchedule } from "@/fluid/schedule";
 import { seedEnabled, seedSplats } from "@/fluid/seed";
-import type { FluidSettings } from "@/fluid/settings";
 import { DEFAULT_SETTINGS } from "@/fluid/settings";
-import {
-  loadResolution,
-  loadSettings,
-  saveResolution,
-  saveSettings,
-} from "@/fluid/settingsStorage";
+import { saveResolution } from "@/fluid/settingsStorage";
 import type { FluidRenderer } from "@/fluid/types";
 import { GpuNotice } from "@/GpuNotice";
 import { SettingsPanel } from "@/SettingsPanel";
+import { useFluidSettings } from "@/useFluidSettings";
 
 /** Cap the backing store on high-DPI displays: past 2x the extra pixels cost
  * fill rate without being visible. */
 const MAX_PIXEL_RATIO = 2;
-
-const SAVE_DEBOUNCE_MS = 200;
 
 export const FluidCanvas = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -36,60 +28,16 @@ export const FluidCanvas = () => {
     message: string;
     resolutionSuspect: boolean;
   } | null>(null);
-  const [settings, setSettings] = useState<FluidSettings>(loadSettings);
-  const [resolution, setResolution] =
-    useState<ResolutionSettings>(loadResolution);
-
-  // Held in a ref as well as state: the simulation effect must not re-run —
-  // and tear down the GPU device — every time a slider moves.
-  const rendererRef = useRef<FluidRenderer | null>(null);
-  const pointerRef = useRef<PointerTracker | null>(null);
-  const settingsRef = useRef(settings);
-  const resolutionRef = useRef(resolution);
-
-  const saveTimerRef = useRef<number | null>(null);
-
-  const applySettings = useCallback((next: FluidSettings) => {
-    settingsRef.current = next;
-    setSettings(next);
-    rendererRef.current?.applySettings(next);
-    pointerRef.current?.setForce(next.splatForce);
-
-    // Debounced because a dragged slider fires per pointer move; only the value
-    // it rests on has to be stored, while the lines above take every one.
-    if (saveTimerRef.current !== null) {
-      window.clearTimeout(saveTimerRef.current);
-    }
-    saveTimerRef.current = window.setTimeout(() => {
-      saveTimerRef.current = null;
-      saveSettings(settingsRef.current);
-    }, SAVE_DEBOUNCE_MS);
-  }, []);
-
-  // Undebounced, unlike the settings above: the panel only reports a resolution
-  // once the drag ends, so there is no per-move burst to collapse.
-  const applyResolution = useCallback((next: ResolutionSettings) => {
-    resolutionRef.current = next;
-    setResolution(next);
-    rendererRef.current?.setResolution(next);
-    saveResolution(next);
-  }, []);
-
-  // Flushed on hide because a pending save would otherwise be lost to a tab
-  // closed mid-drag; `pagehide` is the last event a bfcache-eligible page gets.
-  useEffect(() => {
-    const flush = (): void => {
-      if (saveTimerRef.current === null) return;
-      window.clearTimeout(saveTimerRef.current);
-      saveTimerRef.current = null;
-      saveSettings(settingsRef.current);
-    };
-    window.addEventListener("pagehide", flush);
-    return () => {
-      window.removeEventListener("pagehide", flush);
-      flush();
-    };
-  }, []);
+  const {
+    settings,
+    resolution,
+    applySettings,
+    applyResolution,
+    rendererRef,
+    pointerRef,
+    settingsRef,
+    resolutionRef,
+  } = useFluidSettings();
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -280,7 +228,7 @@ export const FluidCanvas = () => {
       pointerRef.current = null;
       gpuDevice?.destroy();
     };
-  }, []);
+  }, [pointerRef, rendererRef, resolutionRef, settingsRef]);
 
   if (failure !== null) {
     return (
