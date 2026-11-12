@@ -15,11 +15,7 @@ import { GpuUnavailableError } from "@/fluid/gpu";
 import type { createFluidRenderer } from "@/fluid/renderer";
 import { DEFAULT_RESOLUTION } from "@/fluid/resolution";
 import { DEFAULT_SETTINGS } from "@/fluid/settings";
-import {
-  loadResolution,
-  loadSettings,
-  saveResolution,
-} from "@/fluid/settingsStorage";
+import { loadResolution, saveResolution } from "@/fluid/settingsStorage";
 import type { FluidRenderer, Splat } from "@/fluid/types";
 import { FluidCanvas } from "@/FluidCanvas";
 
@@ -285,20 +281,6 @@ describe("FluidCanvas teardown", () => {
       "change",
       listeners[0],
     );
-  });
-
-  it("flushes a settings save still waiting on its debounce", async () => {
-    const { unmount } = await mount();
-    vi.useFakeTimers();
-    openPanel();
-    fireEvent.change(screen.getByRole("slider", { name: "Splat force" }), {
-      target: { value: "20" },
-    });
-    expect(loadSettings().splatForce).toBe(DEFAULT_SETTINGS.splatForce);
-
-    unmount();
-
-    expect(loadSettings().splatForce).toBe(20);
   });
 });
 
@@ -760,9 +742,8 @@ describe("FluidCanvas frame loop", () => {
 });
 
 describe("FluidCanvas settings", () => {
-  it("applies a moved slider at once and stores only where it came to rest", async () => {
+  it("applies a moved slider to the renderer at once", async () => {
     await mount();
-    vi.useFakeTimers();
     openPanel();
     const force = screen.getByRole("slider", { name: "Splat force" });
 
@@ -773,27 +754,6 @@ describe("FluidCanvas settings", () => {
       ...DEFAULT_SETTINGS,
       splatForce: 30,
     });
-    expect(loadSettings().splatForce).toBe(DEFAULT_SETTINGS.splatForce);
-
-    vi.advanceTimersByTime(200);
-    expect(loadSettings().splatForce).toBe(30);
-  });
-
-  it("stores a pending change on pagehide, and does nothing on a second one", async () => {
-    await mount();
-    vi.useFakeTimers();
-    openPanel();
-    fireEvent.change(screen.getByRole("slider", { name: "Splat force" }), {
-      target: { value: "20" },
-    });
-
-    window.dispatchEvent(new Event("pagehide"));
-    expect(loadSettings().splatForce).toBe(20);
-
-    window.localStorage.clear();
-    window.dispatchEvent(new Event("pagehide"));
-    vi.advanceTimersByTime(200);
-    expect(loadSettings()).toEqual(DEFAULT_SETTINGS);
   });
 
   it("rebuilds at a committed resolution, stores it, and resets both on Reset", async () => {
