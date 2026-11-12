@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   clampSetting,
   DEFAULT_SETTINGS,
+  liftStrength,
   normaliseSettings,
   SETTING_DESCRIPTORS,
 } from "./settings";
@@ -67,7 +68,20 @@ describe("normaliseSettings", () => {
   it("lets the buoyancy strength reach zero, which switches the pass off", () => {
     expect(clampSetting("buoyancy", 0)).toBe(0);
     expect(clampSetting("buoyancy", -3)).toBe(0);
-    expect(clampSetting("buoyancy", 1e6)).toBe(100);
+    expect(clampSetting("buoyancy", 1e6)).toBe(1000);
+  });
+
+  it("lets gravity reach zero, which switches the lift off", () => {
+    expect(clampSetting("gravity", 0)).toBe(0);
+    expect(clampSetting("gravity", -3)).toBe(0);
+    expect(clampSetting("gravity", 1e6)).toBe(30);
+  });
+
+  it("defaults gravity to Earth's surface value, also for a blob that predates it", () => {
+    expect(DEFAULT_SETTINGS.gravity).toBe(9.8);
+    expect(normaliseSettings({ buoyancy: 40 }).gravity).toBe(9.8);
+    expect(normaliseSettings({ gravity: "x" }).gravity).toBe(9.8);
+    expect(normaliseSettings({ gravity: 3 }).gravity).toBe(3);
   });
 
   it("keeps the cooling rate above zero, so heat always decays", () => {
@@ -132,6 +146,28 @@ describe("wrapEdges", () => {
   it("falls back to the default for a stored value that is not a boolean", () => {
     expect(normaliseSettings({ wrapEdges: 1 }).wrapEdges).toBe(false);
     expect(normaliseSettings({ wrapEdges: "true" }).wrapEdges).toBe(false);
+  });
+});
+
+describe("liftStrength", () => {
+  it("is the buoyancy setting alone at Earth's gravity", () => {
+    expect(liftStrength({ buoyancy: 10, gravity: 9.8 })).toBeCloseTo(10, 10);
+    expect(
+      liftStrength({
+        buoyancy: DEFAULT_SETTINGS.buoyancy,
+        gravity: DEFAULT_SETTINGS.gravity,
+      }),
+    ).toBeCloseTo(DEFAULT_SETTINGS.buoyancy, 10);
+  });
+
+  it("scales with gravity and with buoyancy", () => {
+    expect(liftStrength({ buoyancy: 10, gravity: 19.6 })).toBeCloseTo(20, 10);
+    expect(liftStrength({ buoyancy: 500, gravity: 9.8 })).toBeCloseTo(500, 10);
+  });
+
+  it("is zero when either factor is zero, which skips the pass", () => {
+    expect(liftStrength({ buoyancy: 0, gravity: 9.8 })).toBe(0);
+    expect(liftStrength({ buoyancy: 10, gravity: 0 })).toBe(0);
   });
 });
 

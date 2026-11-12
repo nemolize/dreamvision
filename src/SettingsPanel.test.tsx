@@ -49,7 +49,7 @@ describe("SettingsPanel", () => {
 
     await open();
 
-    expect(screen.getAllByRole("slider")).toHaveLength(10);
+    expect(screen.getAllByRole("slider")).toHaveLength(11);
     expect(screen.getByRole("heading", { name: "Settings" })).toBeTruthy();
   });
 

@@ -13,7 +13,7 @@ import { sameResolution } from "./resolution";
 import type { Resources } from "./resources";
 import { buildResources, releaseResources } from "./resources";
 import type { FluidSettings } from "./settings";
-import { DEFAULT_SETTINGS } from "./settings";
+import { DEFAULT_SETTINGS, liftStrength } from "./settings";
 import type { FluidRenderer, Splat } from "./types";
 import {
   ADVECT_PARAM,
@@ -171,6 +171,7 @@ export const createFluidRenderer = (
     const current = resources;
     if (current === null) return;
 
+    const lift = liftStrength(settings);
     packUniforms(
       uniformData,
       current.simGrid,
@@ -179,7 +180,7 @@ export const createFluidRenderer = (
       dt,
       settings.wrapEdges,
       settings.vorticityConfinement,
-      settings.buoyancy,
+      lift,
       up,
     );
     device.queue.writeBuffer(uniformBuffer, 0, uniformData);
@@ -209,7 +210,7 @@ export const createFluidRenderer = (
       splatSlotBytes,
       pressureIterations: settings.pressureIterations,
       vorticityConfinement: settings.vorticityConfinement,
-      buoyancy: settings.buoyancy,
+      buoyancy: lift,
       timing,
     });
 

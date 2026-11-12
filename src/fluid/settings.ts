@@ -1,6 +1,7 @@
 import {
   BUOYANCY_STRENGTH,
   DYE_DISSIPATION,
+  EARTH_GRAVITY,
   HEAT_COOLING,
   PRESSURE_ITERATIONS,
   SPLAT_FORCE,
@@ -21,6 +22,7 @@ export interface NumericSettings {
   pressureIterations: number;
   vorticityConfinement: number;
   buoyancy: number;
+  gravity: number;
   heatCooling: number;
 }
 
@@ -37,6 +39,7 @@ const NUMERIC_DEFAULTS: NumericSettings = {
   pressureIterations: PRESSURE_ITERATIONS,
   vorticityConfinement: VORTICITY_CONFINEMENT,
   buoyancy: BUOYANCY_STRENGTH,
+  gravity: EARTH_GRAVITY,
   heatCooling: HEAT_COOLING,
 };
 
@@ -101,9 +104,17 @@ export const SETTING_DESCRIPTORS: readonly SettingDescriptor<
     key: "buoyancy",
     label: "Buoyancy",
     min: 0,
-    max: 100,
+    max: 1000,
     step: 1,
     precision: 0,
+  },
+  {
+    key: "gravity",
+    label: "Gravity",
+    min: 0,
+    max: 30,
+    step: 0.1,
+    precision: 1,
   },
   // Floor above zero: heat must always decay.
   {
@@ -119,6 +130,12 @@ export const SETTING_DESCRIPTORS: readonly SettingDescriptor<
 const settings = describeSettings(SETTING_DESCRIPTORS, NUMERIC_DEFAULTS);
 
 export const clampSetting = settings.clamp;
+
+export const liftStrength = ({
+  buoyancy,
+  gravity,
+}: Pick<NumericSettings, "buoyancy" | "gravity">): number =>
+  (buoyancy * gravity) / EARTH_GRAVITY;
 
 const readFlag = (input: unknown, key: "wrapEdges" | "showStats"): boolean => {
   const value: unknown =

@@ -28,6 +28,8 @@ export const VORTICITY_CONFINEMENT = 10;
 /** Cells per second squared of lift per unit of heat; 0 switches the pass off. */
 export const BUOYANCY_STRENGTH = 10;
 
+export const EARTH_GRAVITY = 9.8;
+
 export const HEAT_COOLING = 1;
 
 export const HEAT_PER_DYE = 0.2;

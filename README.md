@@ -96,8 +96,10 @@ it. A `buoyancy` pass between the confinement and the projection lifts hot
 cells along the up direction, which follows the device's gravity reading
 (rotated by the screen's orientation and smoothed) and points up the screen
 when there is none. On iOS Safari the motion permission is requested on the
-first pointer release. `buoyancy.test.ts` checks the lift on the CPU, and a
-strength of 0 skips the pass.
+first pointer release. The lift is the buoyancy setting scaled by the gravity
+setting over Earth's 9.8 m/s², so the default gravity leaves buoyancy alone.
+`buoyancy.test.ts` checks the lift on the CPU, and a lift of 0 (either setting
+at 0) skips the pass.
 
 One deviation from a textbook solver remains: `divergence` and
 `gradientSubtract` use central differences while the Jacobi sweep solves a
@@ -114,9 +116,9 @@ the options are in
 
 ### The settings panel
 
-The gear opens ten sliders over the running canvas. The eight solver settings
+The gear opens eleven sliders over the running canvas. The nine solver settings
 reach the running frame as the slider moves; the two grid resolutions wait for
-the drag to end, for the reason the next section gives. All ten are stored, so
+the drag to end, for the reason the next section gives. All eleven are stored, so
 the next load opens where you left it.
 
 The `Frame stats` checkbox, off by default, shows the frame rate and the GPU time
