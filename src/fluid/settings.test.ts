@@ -104,7 +104,11 @@ describe("normaliseSettings", () => {
 describe("SETTING_DESCRIPTORS", () => {
   it("gives every setting a descriptor whose range holds its default", () => {
     const described = SETTING_DESCRIPTORS.map((descriptor) => descriptor.key);
-    const { wrapEdges: _toggle, ...numeric } = DEFAULT_SETTINGS;
+    const {
+      wrapEdges: _wrap,
+      showStats: _stats,
+      ...numeric
+    } = DEFAULT_SETTINGS;
     expect([...described].sort()).toEqual(Object.keys(numeric).sort());
 
     for (const { key, min, max } of SETTING_DESCRIPTORS) {
@@ -128,5 +132,22 @@ describe("wrapEdges", () => {
   it("falls back to the default for a stored value that is not a boolean", () => {
     expect(normaliseSettings({ wrapEdges: 1 }).wrapEdges).toBe(false);
     expect(normaliseSettings({ wrapEdges: "true" }).wrapEdges).toBe(false);
+  });
+});
+
+describe("showStats", () => {
+  it("defaults to hidden", () => {
+    expect(DEFAULT_SETTINGS.showStats).toBe(false);
+    expect(normaliseSettings({}).showStats).toBe(false);
+  });
+
+  it("keeps a stored boolean, and defaults a blob that predates it", () => {
+    expect(normaliseSettings({ showStats: true }).showStats).toBe(true);
+    expect(normaliseSettings({ wrapEdges: true }).showStats).toBe(false);
+  });
+
+  it("falls back to hidden for a stored value that is not a boolean", () => {
+    expect(normaliseSettings({ showStats: "yes" }).showStats).toBe(false);
+    expect(normaliseSettings({ showStats: 1 }).showStats).toBe(false);
   });
 });

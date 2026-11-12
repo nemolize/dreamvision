@@ -119,6 +119,11 @@ reach the running frame as the slider moves; the two grid resolutions wait for
 the drag to end, for the reason the next section gives. All ten are stored, so
 the next load opens where you left it.
 
+The `Frame stats` checkbox, off by default, shows the frame rate and the GPU time
+of one frame in the corner of the canvas, averaged over half a second. On an
+adapter without `timestamp-query` the time reads `–` and the frame rate still
+shows.
+
 ![The settings panel open over the running simulation, showing its sliders and their current values](docs/images/settings.webp)
 
 ### What the resolution sliders cost
@@ -151,6 +156,7 @@ without that the notice would be a dead end.
 - `src/FluidCanvas.tsx` — the canvas host; owns the animation loop, and holds
   the settings the panel edits alongside any failure to report
 - `src/SettingsPanel.tsx` — the collapsible panel of solver controls
+- `src/FrameReadout.tsx` — the frame-stats readout the panel's toggle shows
 - `src/GpuNotice.tsx` — what replaces the canvas when the GPU fails, including
   the offer to reset the resolution
 - `e2e-tests/` — Playwright specs, including one that drags across the canvas

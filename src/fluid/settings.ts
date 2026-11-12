@@ -26,6 +26,7 @@ export interface NumericSettings {
 
 export interface FluidSettings extends NumericSettings {
   wrapEdges: boolean;
+  showStats: boolean;
 }
 
 const NUMERIC_DEFAULTS: NumericSettings = {
@@ -42,6 +43,7 @@ const NUMERIC_DEFAULTS: NumericSettings = {
 export const DEFAULT_SETTINGS: FluidSettings = {
   ...NUMERIC_DEFAULTS,
   wrapEdges: false,
+  showStats: false,
 };
 
 export const SETTING_DESCRIPTORS: readonly SettingDescriptor<
@@ -118,14 +120,16 @@ const settings = describeSettings(SETTING_DESCRIPTORS, NUMERIC_DEFAULTS);
 
 export const clampSetting = settings.clamp;
 
-export const normaliseSettings = (input: unknown): FluidSettings => {
-  const wrapEdges =
-    typeof input === "object" && input !== null && "wrapEdges" in input
-      ? input.wrapEdges
+const readFlag = (input: unknown, key: "wrapEdges" | "showStats"): boolean => {
+  const value: unknown =
+    typeof input === "object" && input !== null && key in input
+      ? Reflect.get(input, key)
       : undefined;
-  return {
-    ...settings.normalise(input),
-    wrapEdges:
-      typeof wrapEdges === "boolean" ? wrapEdges : DEFAULT_SETTINGS.wrapEdges,
-  };
+  return typeof value === "boolean" ? value : DEFAULT_SETTINGS[key];
 };
+
+export const normaliseSettings = (input: unknown): FluidSettings => ({
+  ...settings.normalise(input),
+  wrapEdges: readFlag(input, "wrapEdges"),
+  showStats: readFlag(input, "showStats"),
+});

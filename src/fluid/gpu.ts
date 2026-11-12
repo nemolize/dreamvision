@@ -33,7 +33,11 @@ export const initGpu = async (
     );
   }
 
-  const device = await adapter.requestDevice();
+  const device = await adapter.requestDevice({
+    requiredFeatures: adapter.features.has("timestamp-query")
+      ? ["timestamp-query"]
+      : [],
+  });
 
   const context = canvas.getContext("webgpu");
   if (context === null) {

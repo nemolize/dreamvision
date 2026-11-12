@@ -48,6 +48,11 @@ describe("loadSettings", () => {
     expect(loadSettings()).toMatchObject({ buoyancy: 37, heatCooling: 2.5 });
   });
 
+  it("persists the frame-stats toggle", () => {
+    saveSettings({ ...DEFAULT_SETTINGS, showStats: true });
+    expect(loadSettings().showStats).toBe(true);
+  });
+
   it("falls back to the defaults on a corrupt blob", () => {
     window.localStorage.setItem(STORAGE_KEY, "{not json");
     expect(loadSettings()).toEqual(DEFAULT_SETTINGS);

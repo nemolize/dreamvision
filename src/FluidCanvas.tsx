@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 
+import type { FrameReading } from "@/fluid/frameStats";
+import { StatsMeter } from "@/fluid/frameStats";
 import { GpuUnavailableError, initGpu } from "@/fluid/gpu";
 import { GravityTracker } from "@/fluid/gravity";
 import { watchGravity } from "@/fluid/gravityInput";
@@ -12,6 +14,7 @@ import { seedEnabled, seedSplats } from "@/fluid/seed";
 import { DEFAULT_SETTINGS } from "@/fluid/settings";
 import { saveResolution } from "@/fluid/settingsStorage";
 import type { FluidRenderer } from "@/fluid/types";
+import { FrameReadout } from "@/FrameReadout";
 import { GpuNotice } from "@/GpuNotice";
 import { SettingsPanel } from "@/SettingsPanel";
 import { useFluidSettings } from "@/useFluidSettings";
@@ -28,6 +31,7 @@ export const FluidCanvas = () => {
     message: string;
     resolutionSuspect: boolean;
   } | null>(null);
+  const [reading, setReading] = useState<FrameReading | null>(null);
   const {
     settings,
     resolution,
@@ -90,8 +94,11 @@ export const FluidCanvas = () => {
       pointer.release(event.pointerId);
     };
 
+    let meter: StatsMeter | null = null;
+
     const onVisibilityChange = (): void => {
       motion.setHidden(document.hidden);
+      meter?.restart();
     };
 
     const onMotionPreferenceChange = (): void => {
@@ -176,19 +183,25 @@ export const FluidCanvas = () => {
           : [],
       );
 
+      const frameMeter = new StatsMeter(renderer, setReading);
+      meter = frameMeter;
+
       const loop = (now: number): void => {
         const elapsed = (now - previous) / 1000;
         previous = now;
+        const { showStats } = settingsRef.current;
 
         if (!motion.open) {
+          frameMeter.update(now, showStats, false);
           frameId = requestAnimationFrame(loop);
           return;
         }
 
-        schedule.advance(elapsed, {
+        const advanced = schedule.advance(elapsed, {
           consume: () => pointer.consume(),
           frame: (splats, dt) => renderer?.frame(splats, dt, gravity.step(dt)),
         });
+        frameMeter.update(now, showStats, advanced > 0);
 
         frameId = requestAnimationFrame(loop);
       };
@@ -247,6 +260,7 @@ export const FluidCanvas = () => {
   return (
     <>
       <canvas ref={canvasRef} aria-label="Fluid simulation" tabIndex={0} />
+      {settings.showStats && <FrameReadout reading={reading} />}
       <SettingsPanel
         settings={settings}
         resolution={resolution}

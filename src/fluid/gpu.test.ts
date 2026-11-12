@@ -9,13 +9,20 @@ interface FakeWebGpu {
   device: object;
 }
 
-const stubWebGpu = (adapter: object | null): FakeWebGpu => {
+const stubWebGpu = (
+  adapter: object | null,
+  features: readonly string[] = [],
+): FakeWebGpu => {
   const device = { label: "fake-device" };
   const requestDevice = vi.fn().mockResolvedValue(device);
   const fake: FakeWebGpu = {
     requestAdapter: vi
       .fn()
-      .mockResolvedValue(adapter === null ? null : { requestDevice }),
+      .mockResolvedValue(
+        adapter === null
+          ? null
+          : { requestDevice, features: new Set(features) },
+      ),
     requestDevice,
     getPreferredCanvasFormat: vi.fn().mockReturnValue("bgra8unorm"),
     device,
@@ -93,6 +100,20 @@ describe("initGpu", () => {
       device: gpu.device,
       context,
       format: "bgra8unorm",
+    });
+  });
+
+  it("asks for GPU timestamps only when the adapter offers them", async () => {
+    const offered = stubWebGpu({}, ["timestamp-query"]);
+    await initGpu(canvasWith({ configure: vi.fn() }));
+    expect(offered.requestDevice).toHaveBeenCalledExactlyOnceWith({
+      requiredFeatures: ["timestamp-query"],
+    });
+
+    const withheld = stubWebGpu({});
+    await initGpu(canvasWith({ configure: vi.fn() }));
+    expect(withheld.requestDevice).toHaveBeenCalledExactlyOnceWith({
+      requiredFeatures: [],
     });
   });
 });

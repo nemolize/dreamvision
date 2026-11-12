@@ -1,3 +1,4 @@
+import type { FrameTiming } from "./gpuTimer";
 import { dispatchSize } from "./grid";
 import type { Pipelines } from "./pipelines";
 import type { Resources } from "./resources";
@@ -14,6 +15,7 @@ export interface FrameEncode {
   pressureIterations: number;
   vorticityConfinement: number;
   buoyancy: number;
+  timing: FrameTiming | null;
 }
 
 export const encodeFrame = ({
@@ -28,11 +30,14 @@ export const encodeFrame = ({
   pressureIterations,
   vorticityConfinement,
   buoyancy,
+  timing,
 }: FrameEncode): void => {
   const { simGrid, dyeGrid, velocity, dye, pressure } = resources;
 
   const encoder = device.createCommandEncoder();
-  const pass = encoder.beginComputePass();
+  const pass = encoder.beginComputePass(
+    timing === null ? undefined : { timestampWrites: timing.computeWrites },
+  );
   pass.setBindGroup(0, sharedBindGroup);
 
   const simDispatch = dispatchSize(simGrid);
@@ -130,11 +135,14 @@ export const encodeFrame = ({
         clearValue: { r: 0, g: 0, b: 0, a: 1 },
       },
     ],
+    ...(timing !== null && { timestampWrites: timing.renderWrites }),
   });
   display.setPipeline(pipelines.display);
   display.setBindGroup(0, resources.display[dye.readFace]);
   display.draw(3);
   display.end();
+
+  timing?.resolve(encoder);
 
   device.queue.submit([encoder.finish()]);
 };
