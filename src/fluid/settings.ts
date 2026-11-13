@@ -22,7 +22,7 @@ export interface NumericSettings {
   pressureIterations: number;
   vorticityConfinement: number;
   gravity: number;
-  scale: number;
+  sceneWidth: number;
   heatCooling: number;
 }
 
@@ -39,7 +39,7 @@ const NUMERIC_DEFAULTS: NumericSettings = {
   pressureIterations: PRESSURE_ITERATIONS,
   vorticityConfinement: VORTICITY_CONFINEMENT,
   gravity: EARTH_GRAVITY,
-  scale: SCENE_WIDTH_METRES,
+  sceneWidth: SCENE_WIDTH_METRES,
   heatCooling: HEAT_COOLING,
 };
 
@@ -109,7 +109,7 @@ export const SETTING_DESCRIPTORS: readonly SettingDescriptor<
     precision: 1,
   },
   {
-    key: "scale",
+    key: "sceneWidth",
     label: "Scale (m)",
     min: 0.01,
     max: 100,

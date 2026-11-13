@@ -64,10 +64,10 @@ describe("normaliseSettings", () => {
     expect(clampSetting("vorticityConfinement", 1e6)).toBe(50);
   });
 
-  it("keeps the scale above zero, so a cell always has a size", () => {
-    expect(clampSetting("scale", 0)).toBe(0.01);
-    expect(clampSetting("scale", -3)).toBe(0.01);
-    expect(clampSetting("scale", 1e6)).toBe(100);
+  it("keeps the scene width above zero, so a cell always has a size", () => {
+    expect(clampSetting("sceneWidth", 0)).toBe(0.01);
+    expect(clampSetting("sceneWidth", -3)).toBe(0.01);
+    expect(clampSetting("sceneWidth", 1e6)).toBe(100);
   });
 
   it("lets gravity run from -100 to 100, through zero, which switches the lift off", () => {
@@ -89,13 +89,13 @@ describe("normaliseSettings", () => {
     expect(clampSetting("heatCooling", -1)).toBeGreaterThan(0);
   });
 
-  it("keeps a stored scale and cooling rate, and defaults a blob that predates them", () => {
-    expect(normaliseSettings({ scale: 5, heatCooling: 2 })).toMatchObject({
-      scale: 5,
+  it("keeps a stored scene width and cooling rate, and defaults a blob that predates them", () => {
+    expect(normaliseSettings({ sceneWidth: 5, heatCooling: 2 })).toMatchObject({
+      sceneWidth: 5,
       heatCooling: 2,
     });
     expect(normaliseSettings({ splatForce: 50 })).toMatchObject({
-      scale: DEFAULT_SETTINGS.scale,
+      sceneWidth: DEFAULT_SETTINGS.sceneWidth,
       heatCooling: DEFAULT_SETTINGS.heatCooling,
     });
   });

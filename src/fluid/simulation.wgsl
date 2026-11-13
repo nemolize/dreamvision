@@ -23,7 +23,7 @@ struct Uniforms {
   toStored: vec2f,
   wrapEdges: f32,      // 1 joins opposite edges, 0 leaves them as walls
   vorticity: f32,      // confinement strength; 0 leaves the velocity untouched
-  gravity: f32,        // cells per second squared; 0 adds no lift
+  gravityCells: f32,   // gravity in cells per second squared; 0 adds no lift
   _pad2: f32,
   up: vec2f,           // unit screen-space direction heat rises, y down
   _pad3: vec2f,
@@ -179,8 +179,8 @@ fn buoyancy(@builtin(global_invocation_id) gid: vec3u) {
   let dyeCell = (cell + 0.5) / u.simSize * dyeSize - 0.5;
   let heat = max(sampleAt(buoyancyDye, dyeSize, dyeCell).a, 0.0);
 
-  // An ideal-gas parcel gets the share heat / (1 + heat) of gravity.
-  let force = u.gravity * heat / (1.0 + heat) * u.up;
+  // Boussinesq: density deficit over the surroundings' density, heat / (1 + heat).
+  let force = u.gravityCells * heat / (1.0 + heat) * u.up;
   let velocity = sampleAt(buoyancyVelocity, u.simSize, cell).xy;
   let lifted = velocity + u.toStored * force * u.dt;
   textureStore(buoyancyOutput, gid.xy, vec4f(lifted, 0.0, 1.0));

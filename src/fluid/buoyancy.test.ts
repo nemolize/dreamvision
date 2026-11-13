@@ -115,7 +115,7 @@ describe("buoyancy", () => {
     expect(along(lifted, UP, centre, centre)).toBeGreaterThan(0);
   });
 
-  it("adds nothing along it at strength 0", () => {
+  it("adds nothing along it at gravity 0", () => {
     const lifted = buoyancy(rest(n, n), heat, 0, UP, DT, false);
     expect(along(lifted, UP, centre, centre)).toBe(0);
   });
@@ -299,17 +299,17 @@ describe("the lift through the projection", () => {
       expect(along(projected, UP, centre, centre)).toBeGreaterThan(0);
     });
 
-    it(`leaves a flow with no buoyancy at rest, with ${edges}`, () => {
+    it(`leaves a flow with no gravity at rest, with ${edges}`, () => {
       const lifted = buoyancy(rest(n, n), heat, 0, UP, DT, wrap);
       const projected = project(lifted, wrap, sweeps);
       expect(Math.max(...projected.y.data.map(Math.abs))).toBe(0);
     });
 
-    it(`is linear in the strength, with ${edges}`, () => {
-      const rise = (strength: number): number =>
+    it(`is linear in the gravity, with ${edges}`, () => {
+      const rise = (gravity: number): number =>
         along(
           project(
-            buoyancy(rest(n, n), heat, strength, UP, DT, wrap),
+            buoyancy(rest(n, n), heat, gravity, UP, DT, wrap),
             wrap,
             sweeps,
           ),
@@ -343,7 +343,7 @@ describe("the shader's side of it", () => {
       /let heat = max\(sampleAt\(buoyancyDye, dyeSize, dyeCell\)\.a, 0\.0\);/,
     );
     expect(simulationShaderSource).toMatch(
-      /let force = u\.gravity \* heat \/ \(1\.0 \+ heat\) \* u\.up;/,
+      /let force = u\.gravityCells \* heat \/ \(1\.0 \+ heat\) \* u\.up;/,
     );
     expect(simulationShaderSource).toMatch(
       /let lifted = velocity \+ u\.toStored \* force \* u\.dt;/,

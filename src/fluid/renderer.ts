@@ -5,7 +5,6 @@ import { createGpuTimer } from "./gpuTimer";
 import type { Direction } from "./gravity";
 import type { Grid } from "./grid";
 import { fitGrids, needsRebuild } from "./grid";
-import { gravityInCells } from "./lift";
 import { createPipelines } from "./pipelines";
 import type { ResampleField } from "./resample";
 import { createFieldResampler } from "./resample";
@@ -172,11 +171,6 @@ export const createFluidRenderer = (
     const current = resources;
     if (current === null) return;
 
-    const gravity = gravityInCells(
-      settings.gravity,
-      settings.scale,
-      current.simGrid.width,
-    );
     packUniforms(
       uniformData,
       current.simGrid,
@@ -185,7 +179,8 @@ export const createFluidRenderer = (
       dt,
       settings.wrapEdges,
       settings.vorticityConfinement,
-      gravity,
+      settings.gravity,
+      settings.sceneWidth,
       up,
     );
     device.queue.writeBuffer(uniformBuffer, 0, uniformData);
@@ -215,7 +210,7 @@ export const createFluidRenderer = (
       splatSlotBytes,
       pressureIterations: settings.pressureIterations,
       vorticityConfinement: settings.vorticityConfinement,
-      gravity,
+      gravity: settings.gravity,
       timing,
     });
 
