@@ -42,10 +42,19 @@ describe("loadSettings", () => {
     expect(loadSettings()).toEqual(stored);
   });
 
-  it("persists the buoyancy strength and the cooling rate", () => {
-    const stored = { ...DEFAULT_SETTINGS, buoyancy: 37, heatCooling: 2.5 };
+  it("persists the gravity, the scale and the cooling rate", () => {
+    const stored = {
+      ...DEFAULT_SETTINGS,
+      gravity: -3.5,
+      scale: 12,
+      heatCooling: 2.5,
+    };
     saveSettings(stored);
-    expect(loadSettings()).toMatchObject({ buoyancy: 37, heatCooling: 2.5 });
+    expect(loadSettings()).toMatchObject({
+      gravity: -3.5,
+      scale: 12,
+      heatCooling: 2.5,
+    });
   });
 
   it("persists the frame-stats toggle", () => {

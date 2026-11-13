@@ -34,7 +34,7 @@ interface Trace {
 
 const encode = (
   vorticityConfinement: number,
-  buoyancy = 0,
+  gravity = 0,
   timing: FrameTiming | null = null,
   trace: Trace = { computeDescriptors: [], renderDescriptors: [], order: [] },
 ): Call[] => {
@@ -128,7 +128,7 @@ const encode = (
     splatSlotBytes: 256,
     pressureIterations: 1,
     vorticityConfinement,
-    buoyancy,
+    gravity,
     timing,
   };
   if (!isFrameEncode(frame)) throw new Error("unreachable");
@@ -169,7 +169,7 @@ describe("encodeFrame's vorticity confinement", () => {
   });
 });
 
-describe("encodeFrame's buoyancy", () => {
+describe("encodeFrame's buoyancy pass", () => {
   it("lifts after the confinement and before the projection, reading velocity face then dye face", () => {
     const calls = encode(10, 10);
 
@@ -194,13 +194,13 @@ describe("encodeFrame's buoyancy", () => {
     expect(calls[2]).toStrictEqual(["divergence", "divergencePass:0"]);
   });
 
-  it("runs no pass at strength 0", () => {
+  it("runs no pass at gravity 0", () => {
     expect(encode(0, 0).map(([pipeline]) => pipeline)).not.toContain(
       "buoyancy",
     );
   });
 
-  it("runs the pass at a negative strength, which sinks hot dye", () => {
+  it("runs the pass at a negative gravity, which sinks hot dye", () => {
     expect(encode(0, -10).map(([pipeline]) => pipeline)).toContain("buoyancy");
   });
 });

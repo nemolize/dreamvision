@@ -5,6 +5,7 @@ import { createGpuTimer } from "./gpuTimer";
 import type { Direction } from "./gravity";
 import type { Grid } from "./grid";
 import { fitGrids, needsRebuild } from "./grid";
+import { gravityInCells } from "./lift";
 import { createPipelines } from "./pipelines";
 import type { ResampleField } from "./resample";
 import { createFieldResampler } from "./resample";
@@ -13,7 +14,7 @@ import { sameResolution } from "./resolution";
 import type { Resources } from "./resources";
 import { buildResources, releaseResources } from "./resources";
 import type { FluidSettings } from "./settings";
-import { DEFAULT_SETTINGS, liftStrength } from "./settings";
+import { DEFAULT_SETTINGS } from "./settings";
 import type { FluidRenderer, Splat } from "./types";
 import {
   ADVECT_PARAM,
@@ -171,7 +172,11 @@ export const createFluidRenderer = (
     const current = resources;
     if (current === null) return;
 
-    const lift = liftStrength(settings);
+    const gravity = gravityInCells(
+      settings.gravity,
+      settings.scale,
+      current.simGrid.width,
+    );
     packUniforms(
       uniformData,
       current.simGrid,
@@ -180,7 +185,7 @@ export const createFluidRenderer = (
       dt,
       settings.wrapEdges,
       settings.vorticityConfinement,
-      lift,
+      gravity,
       up,
     );
     device.queue.writeBuffer(uniformBuffer, 0, uniformData);
@@ -210,7 +215,7 @@ export const createFluidRenderer = (
       splatSlotBytes,
       pressureIterations: settings.pressureIterations,
       vorticityConfinement: settings.vorticityConfinement,
-      buoyancy: lift,
+      gravity,
       timing,
     });
 

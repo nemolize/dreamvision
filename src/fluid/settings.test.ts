@@ -3,7 +3,6 @@ import { describe, expect, it } from "vitest";
 import {
   clampSetting,
   DEFAULT_SETTINGS,
-  liftStrength,
   normaliseSettings,
   SETTING_DESCRIPTORS,
 } from "./settings";
@@ -65,10 +64,10 @@ describe("normaliseSettings", () => {
     expect(clampSetting("vorticityConfinement", 1e6)).toBe(50);
   });
 
-  it("lets the buoyancy strength reach zero, which switches the pass off", () => {
-    expect(clampSetting("buoyancy", 0)).toBe(0);
-    expect(clampSetting("buoyancy", -3)).toBe(0);
-    expect(clampSetting("buoyancy", 1e6)).toBe(1000);
+  it("keeps the scale above zero, so a cell always has a size", () => {
+    expect(clampSetting("scale", 0)).toBe(0.01);
+    expect(clampSetting("scale", -3)).toBe(0.01);
+    expect(clampSetting("scale", 1e6)).toBe(100);
   });
 
   it("lets gravity run from -100 to 100, through zero, which switches the lift off", () => {
@@ -80,7 +79,7 @@ describe("normaliseSettings", () => {
 
   it("defaults gravity to Earth's surface value, also for a blob that predates it", () => {
     expect(DEFAULT_SETTINGS.gravity).toBe(9.8);
-    expect(normaliseSettings({ buoyancy: 40 }).gravity).toBe(9.8);
+    expect(normaliseSettings({ splatForce: 40 }).gravity).toBe(9.8);
     expect(normaliseSettings({ gravity: "x" }).gravity).toBe(9.8);
     expect(normaliseSettings({ gravity: 3 }).gravity).toBe(3);
   });
@@ -90,15 +89,19 @@ describe("normaliseSettings", () => {
     expect(clampSetting("heatCooling", -1)).toBeGreaterThan(0);
   });
 
-  it("keeps a stored buoyancy and cooling rate, and defaults a blob that predates them", () => {
-    expect(normaliseSettings({ buoyancy: 40, heatCooling: 2 })).toMatchObject({
-      buoyancy: 40,
+  it("keeps a stored scale and cooling rate, and defaults a blob that predates them", () => {
+    expect(normaliseSettings({ scale: 5, heatCooling: 2 })).toMatchObject({
+      scale: 5,
       heatCooling: 2,
     });
     expect(normaliseSettings({ splatForce: 50 })).toMatchObject({
-      buoyancy: DEFAULT_SETTINGS.buoyancy,
+      scale: DEFAULT_SETTINGS.scale,
       heatCooling: DEFAULT_SETTINGS.heatCooling,
     });
+  });
+
+  it("drops a stored buoyancy, which no longer exists", () => {
+    expect(normaliseSettings({ buoyancy: 40 })).toEqual(DEFAULT_SETTINGS);
   });
 
   it("clamps an out-of-range stored value", () => {
@@ -147,32 +150,6 @@ describe("wrapEdges", () => {
   it("falls back to the default for a stored value that is not a boolean", () => {
     expect(normaliseSettings({ wrapEdges: 1 }).wrapEdges).toBe(false);
     expect(normaliseSettings({ wrapEdges: "true" }).wrapEdges).toBe(false);
-  });
-});
-
-describe("liftStrength", () => {
-  it("is the buoyancy setting alone at Earth's gravity", () => {
-    expect(liftStrength({ buoyancy: 10, gravity: 9.8 })).toBeCloseTo(10, 10);
-    expect(
-      liftStrength({
-        buoyancy: DEFAULT_SETTINGS.buoyancy,
-        gravity: DEFAULT_SETTINGS.gravity,
-      }),
-    ).toBeCloseTo(DEFAULT_SETTINGS.buoyancy, 10);
-  });
-
-  it("scales with gravity and with buoyancy", () => {
-    expect(liftStrength({ buoyancy: 10, gravity: 19.6 })).toBeCloseTo(20, 10);
-    expect(liftStrength({ buoyancy: 500, gravity: 9.8 })).toBeCloseTo(500, 10);
-  });
-
-  it("is negative for a negative gravity, which reverses the lift", () => {
-    expect(liftStrength({ buoyancy: 10, gravity: -9.8 })).toBeCloseTo(-10, 10);
-  });
-
-  it("is zero when either factor is zero, which skips the pass", () => {
-    expect(liftStrength({ buoyancy: 0, gravity: 9.8 })).toBe(0);
-    expect(liftStrength({ buoyancy: 10, gravity: 0 })).toBe(0);
   });
 });
 

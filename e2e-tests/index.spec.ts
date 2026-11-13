@@ -417,20 +417,20 @@ test.describe("fluid canvas", () => {
     expect(wrapped).toBeGreaterThan(10);
   });
 
-  test("lifts hot dye toward the top of the screen only when buoyancy and gravity are above zero, and sinks it for a negative gravity", async ({
+  test("lifts hot dye toward the top of the screen by gravity, more on a smaller canvas, and sinks it for a negative gravity", async ({
     page,
   }) => {
     test.setTimeout(180_000);
 
     const upwardShare = async (
-      buoyancy: string,
-      gravity = "9.8",
+      gravity: string,
+      scale = "3",
     ): Promise<number> => {
       await freshPage(page, "/?seed=off");
 
       await page.getByRole("button", { name: "Open settings" }).click();
-      await settleSlider(page, "Buoyancy", buoyancy);
       await settleSlider(page, "Gravity", gravity);
+      await settleSlider(page, "Scale", scale);
       await settleSlider(page, "Vorticity", "0");
       await cheapenGrids(page);
       await hideSettings(page);
@@ -446,15 +446,15 @@ test.describe("fluid canvas", () => {
       return (upper - lower) / (upper + lower);
     };
 
-    const still = await upwardShare("0");
-    const lifted = await upwardShare("100");
-    const weightless = await upwardShare("100", "0");
-    const sunk = await upwardShare("100", "-9.8");
+    const weightless = await upwardShare("0");
+    const lifted = await upwardShare("9.8");
+    const sunk = await upwardShare("-9.8");
+    const wide = await upwardShare("9.8", "100");
 
     // 0.05 is chosen empirically, no fixed source.
-    expect(lifted - still).toBeGreaterThan(0.05);
     expect(lifted - weightless).toBeGreaterThan(0.05);
     expect(weightless - sunk).toBeGreaterThan(0.05);
+    expect(lifted - wide).toBeGreaterThan(0.05);
   });
 
   test("paints the seed burst before any input", async ({ page }) => {

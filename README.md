@@ -96,11 +96,14 @@ it. A `buoyancy` pass between the confinement and the projection lifts hot
 cells along the up direction, which follows the device's gravity reading
 (rotated by the screen's orientation and smoothed) and points up the screen
 when there is none. On iOS Safari the motion permission is requested on the
-first pointer release. The lift is the buoyancy setting scaled by the gravity
-setting over Earth's 9.8 m/s², so the default gravity leaves buoyancy alone and a
-negative gravity sinks the hot dye.
-`buoyancy.test.ts` checks the lift on the CPU, and a lift of 0 (either setting
-at 0) skips the pass.
+first pointer release. The heat is the temperature excess over the
+surroundings as a fraction, `h = (T − T₀) / T₀`, and an ideal-gas parcel gets the
+share `h / (1 + h)` of gravity: `a = g · h / (1 + h)`, never above `g`. The
+`Gravity` setting is `g` in m/s², and a negative value sinks the hot dye. The
+`Scale` setting is how many metres the canvas width stands for, which turns
+that acceleration into cells per second squared, so a wider canvas reads as
+slower motion. `buoyancy.test.ts` checks the lift on the CPU, and a gravity of 0
+skips the pass.
 
 One deviation from a textbook solver remains: `divergence` and
 `gradientSubtract` use central differences while the Jacobi sweep solves a

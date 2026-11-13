@@ -13,7 +13,7 @@ export const UNIFORM = {
   toStored: 6,
   wrapEdges: 8,
   vorticity: 9,
-  buoyancy: 10,
+  gravity: 10,
   up: 12,
 } as const;
 
@@ -55,7 +55,7 @@ export const packUniforms = (
   dt: number,
   wrapEdges: boolean,
   vorticity: number,
-  buoyancy: number,
+  gravity: number,
   up: readonly [number, number],
 ): void => {
   target.set([simGrid.width, simGrid.height], UNIFORM.simSize);
@@ -66,7 +66,7 @@ export const packUniforms = (
   target.set(metric.toStored, UNIFORM.toStored);
   target[UNIFORM.wrapEdges] = wrapEdges ? 1 : 0;
   target[UNIFORM.vorticity] = vorticity;
-  target[UNIFORM.buoyancy] = buoyancy;
+  target[UNIFORM.gravity] = gravity;
   target.set(up, UNIFORM.up);
 };
 

@@ -99,7 +99,7 @@ describe("packUniforms", () => {
   const pack = (
     wrapEdges = false,
     vorticity = 0,
-    buoyancy = 0,
+    gravity = 0,
     up: readonly [number, number] = [0, -1],
   ): Float32Array => {
     const target = new Float32Array(UNIFORM_FLOATS);
@@ -111,7 +111,7 @@ describe("packUniforms", () => {
       1 / 60,
       wrapEdges,
       vorticity,
-      buoyancy,
+      gravity,
       up,
     );
     return target;
@@ -126,8 +126,8 @@ describe("packUniforms", () => {
     expect(pack(false, 37)[UNIFORM.vorticity]).toBe(37);
   });
 
-  it("writes the buoyancy strength into its own member", () => {
-    expect(pack(false, 0, 23)[UNIFORM.buoyancy]).toBe(23);
+  it("writes the gravity in cells into its own member", () => {
+    expect(pack(false, 0, 23)[UNIFORM.gravity]).toBe(23);
   });
 
   it("writes the up direction as an x, y pair", () => {

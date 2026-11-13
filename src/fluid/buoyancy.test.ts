@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { BUOYANCY_STRENGTH, HEAT_COOLING, REFERENCE_STEP } from "./config";
+import { EARTH_GRAVITY, HEAT_COOLING, REFERENCE_STEP } from "./config";
 import { GravityTracker } from "./gravity";
 import { projectionScale } from "./projection";
 import simulationShaderSource from "./simulation.wgsl?raw";
@@ -57,7 +57,7 @@ type Direction = readonly [number, number];
 const buoyancy = (
   u: Velocity,
   heat: Field,
-  strength: number,
+  gravity: number,
   up: Direction,
   dt: number,
   wrap: boolean,
@@ -71,12 +71,15 @@ const buoyancy = (
       ((y + 0.5) / height) * heat.height - 0.5,
       wrap,
     );
-  const lift = (axis: 0 | 1, x: number, y: number): number =>
-    (axis === 0 ? scale.toStoredX : scale.toStoredY) *
-    strength *
-    heatAt(x, y) *
-    up[axis] *
-    dt;
+  const lift = (axis: 0 | 1, x: number, y: number): number => {
+    const h = Math.max(heatAt(x, y), 0);
+    return (
+      (axis === 0 ? scale.toStoredX : scale.toStoredY) *
+      ((gravity * h) / (1 + h)) *
+      up[axis] *
+      dt
+    );
+  };
   return {
     x: fieldFrom(width, height, (x, y) => at(u.x, x, y, wrap) + lift(0, x, y)),
     y: fieldFrom(width, height, (x, y) => at(u.y, x, y, wrap) + lift(1, x, y)),
@@ -123,7 +126,7 @@ describe("buoyancy", () => {
     expect(Math.max(...lifted.y.data.map(Math.abs))).toBe(0);
   });
 
-  it("scales with the strength, the heat and the step", () => {
+  it("scales with the gravity and the step", () => {
     const base = along(
       buoyancy(rest(n, n), heat, 10, UP, DT, false),
       UP,
@@ -144,6 +147,40 @@ describe("buoyancy", () => {
     );
     expect(stronger).toBeCloseTo(2 * base, 12);
     expect(longer).toBeCloseTo(2 * base, 12);
+  });
+
+  it("gives a parcel a share of gravity that grows with heat but never reaches it", () => {
+    const uniform = (h: number): Field => fieldFrom(n, n, () => h);
+    const limit = projectionScale(n, n).toStoredY * 10 * DT;
+    const rise = (h: number): number =>
+      along(
+        buoyancy(rest(n, n), uniform(h), 10, UP, DT, false),
+        UP,
+        centre,
+        centre,
+      );
+
+    expect(rise(1)).toBeCloseTo(0.5 * limit, 12);
+    expect(rise(0.2)).toBeCloseTo((0.2 / 1.2) * limit, 12);
+    expect(rise(1e9)).toBeLessThanOrEqual(limit);
+    expect(rise(1e9)).toBeCloseTo(limit, 6);
+  });
+
+  it("sinks hot cells for a negative gravity", () => {
+    const lifted = buoyancy(rest(n, n), heat, -10, UP, DT, false);
+    expect(along(lifted, UP, centre, centre)).toBeLessThan(0);
+  });
+
+  it("treats a negative heat as none, so the share stays finite", () => {
+    const lifted = buoyancy(
+      rest(n, n),
+      fieldFrom(n, n, () => -2),
+      10,
+      UP,
+      DT,
+      false,
+    );
+    expect(Math.max(...lifted.y.data.map(Math.abs))).toBe(0);
   });
 
   it("reads the heat off a finer grid at the cell's own centre", () => {
@@ -303,10 +340,10 @@ describe("the heat's decay", () => {
 describe("the shader's side of it", () => {
   it("lifts along the uniform up direction by heat read from the dye's alpha", () => {
     expect(simulationShaderSource).toMatch(
-      /let heat = sampleAt\(buoyancyDye, dyeSize, dyeCell\)\.a;/,
+      /let heat = max\(sampleAt\(buoyancyDye, dyeSize, dyeCell\)\.a, 0\.0\);/,
     );
     expect(simulationShaderSource).toMatch(
-      /let force = u\.buoyancy \* heat \* u\.up;/,
+      /let force = u\.gravity \* heat \/ \(1\.0 \+ heat\) \* u\.up;/,
     );
     expect(simulationShaderSource).toMatch(
       /let lifted = velocity \+ u\.toStored \* force \* u\.dt;/,
@@ -325,7 +362,7 @@ describe("the shader's side of it", () => {
     );
   });
 
-  it("keeps a default strength that does something", () => {
-    expect(BUOYANCY_STRENGTH).toBeGreaterThan(0);
+  it("keeps a default gravity that lifts", () => {
+    expect(EARTH_GRAVITY).toBeGreaterThan(0);
   });
 });
