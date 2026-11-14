@@ -2,6 +2,7 @@ import { useId, useState } from "react";
 
 import type { SettingDescriptor } from "@/fluid/descriptor";
 import {
+  formatSetting,
   fromTrackPosition,
   LOG_TRACK_STEPS,
   toTrackPosition,
@@ -26,8 +27,8 @@ const SliderRow = ({
   onCommit,
   onAbandon,
 }: SliderRowProps) => {
-  const { label, min, max, step, precision, track } = descriptor;
-  const shown = value.toFixed(precision);
+  const { label, min, max, step, track } = descriptor;
+  const shown = formatSetting(descriptor, value);
   const input =
     track === "log"
       ? {

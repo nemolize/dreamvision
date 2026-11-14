@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  formatSetting,
   fromTrackPosition,
   LOG_TRACK_STEPS,
   toTrackPosition,
@@ -52,5 +53,14 @@ describe("a log track", () => {
   it("holds a value outside the range to the track's ends", () => {
     expect(toTrackPosition(scale, 1e6)).toBe(LOG_TRACK_STEPS);
     expect(toTrackPosition(scale, 1e-6)).toBe(0);
+  });
+
+  it("reads differently at every position, so a keypress shows", () => {
+    const readouts = new Set<string>();
+    for (let position = 0; position <= LOG_TRACK_STEPS; position++) {
+      readouts.add(formatSetting(scale, fromTrackPosition(scale, position)));
+    }
+
+    expect(readouts.size).toBe(LOG_TRACK_STEPS + 1);
   });
 });

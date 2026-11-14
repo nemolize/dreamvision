@@ -1,5 +1,7 @@
 import { expect, type Locator, type Page, test } from "@playwright/test";
 
+import { LOG_TRACK_STEPS } from "@/fluid/descriptor";
+
 const outlineStyle = (locator: Locator): Promise<string> =>
   locator.evaluate((element) => getComputedStyle(element).outlineStyle);
 
@@ -177,9 +179,11 @@ test.describe("Scale slider", () => {
     expect(share).toBeLessThan(0.75);
 
     await page.mouse.click(box.x + 1, midY);
+    await expect(slider).toHaveValue("0");
     await expect.poll(shown).toBe(0.01);
 
     await page.mouse.click(box.x + box.width - 1, midY);
+    await expect(slider).toHaveValue(String(LOG_TRACK_STEPS));
     await expect.poll(shown).toBe(100);
 
     await page.mouse.click(box.x + box.width * 0.3, midY);

@@ -2,11 +2,11 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { LOG_TRACK_STEPS } from "@/fluid/descriptor";
+import { fromTrackPosition, LOG_TRACK_STEPS } from "@/fluid/descriptor";
 import type { ResolutionSettings } from "@/fluid/resolution";
 import { DEFAULT_RESOLUTION } from "@/fluid/resolution";
 import type { FluidSettings } from "@/fluid/settings";
-import { DEFAULT_SETTINGS } from "@/fluid/settings";
+import { DEFAULT_SETTINGS, SETTING_DESCRIPTORS } from "@/fluid/settings";
 import { SettingsPanel } from "@/SettingsPanel";
 
 afterEach(cleanup);
@@ -130,6 +130,24 @@ describe("SettingsPanel", () => {
 
     fireEvent.change(scale, { target: { value: String(LOG_TRACK_STEPS / 2) } });
     expect(lastReported(onChange).sceneWidth).toBeCloseTo(1, 6);
+  });
+
+  it("tells the first track position from the range's start on the Scale readout", async () => {
+    const descriptor = SETTING_DESCRIPTORS.find(
+      ({ key }) => key === "sceneWidth",
+    );
+    if (descriptor === undefined) throw new Error("no sceneWidth descriptor");
+    renderPanel({
+      settings: {
+        ...DEFAULT_SETTINGS,
+        sceneWidth: fromTrackPosition(descriptor, 1),
+      },
+    });
+    await open();
+
+    const scale = screen.getByRole("slider", { name: "Scale (m)" });
+    expect(scale.getAttribute("aria-valuetext")).toBe("0.0101");
+    expect(screen.getByText("0.0101")).toBeTruthy();
   });
 
   it("reports the wrap toggle as a whole settings object", async () => {
