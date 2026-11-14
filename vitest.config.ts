@@ -30,6 +30,7 @@ export default defineConfig({
         "src/**/*.{test,spec}.*",
         "src/**/*.d.ts",
         "src/test-setup.ts",
+        "src/fluid/gridField.testing.ts",
         "src/main.tsx",
         "src/App.tsx",
         "src/fluid/doubleBuffer.ts",
