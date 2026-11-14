@@ -1,5 +1,8 @@
 import { expect, type Page } from "@playwright/test";
 
+import { toTrackPosition } from "@/fluid/descriptor";
+import { SETTING_DESCRIPTORS } from "@/fluid/settings";
+
 export const freshPage = async (page: Page, url: string): Promise<void> => {
   await page.goto(url);
   await page.evaluate(() => {
@@ -68,6 +71,21 @@ export const settleSlider = async (
   const slider = page.getByRole("slider", { name });
   await slider.fill(value);
   await slider.blur();
+};
+
+export const settleScale = async (
+  page: Page,
+  metres: number,
+): Promise<void> => {
+  const descriptor = SETTING_DESCRIPTORS.find(
+    ({ key }) => key === "sceneWidth",
+  );
+  if (descriptor === undefined) throw new Error("no sceneWidth descriptor");
+  await settleSlider(
+    page,
+    "Scale",
+    String(toTrackPosition(descriptor, metres)),
+  );
 };
 
 /** Counted in frames because each one advances the simulation by a capped step,

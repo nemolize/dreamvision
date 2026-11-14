@@ -6,7 +6,34 @@ export interface SettingDescriptor<Key extends string> {
   step: number;
   /** Decimals shown beside the slider; the step's precision, not the value's. */
   precision: number;
+  /** Spaces the track by ratio; needs `min > 0`. `step` and `precision` go
+   * unused then: the readout keeps three significant figures. */
+  track?: "log";
 }
+
+export const LOG_TRACK_STEPS = 1000;
+
+type Range = Pick<SettingDescriptor<string>, "min" | "max">;
+
+export const toTrackPosition = ({ min, max }: Range, value: number): number => {
+  const share = Math.log(value / min) / Math.log(max / min);
+  return Math.round(Math.min(1, Math.max(0, share)) * LOG_TRACK_STEPS);
+};
+
+export const fromTrackPosition = (
+  { min, max }: Range,
+  position: number,
+): number => {
+  if (position <= 0) return min;
+  if (position >= LOG_TRACK_STEPS) return max;
+  return min * (max / min) ** (position / LOG_TRACK_STEPS);
+};
+
+export const formatSetting = (
+  { precision, track }: Pick<SettingDescriptor<string>, "precision" | "track">,
+  value: number,
+): string =>
+  track === "log" ? value.toPrecision(3) : value.toFixed(precision);
 
 export interface DescriptorSet<Key extends string> {
   clamp: (key: Key, value: number) => number;

@@ -1,6 +1,12 @@
 import { useId, useState } from "react";
 
 import type { SettingDescriptor } from "@/fluid/descriptor";
+import {
+  formatSetting,
+  fromTrackPosition,
+  LOG_TRACK_STEPS,
+  toTrackPosition,
+} from "@/fluid/descriptor";
 import type { ResolutionSettings } from "@/fluid/resolution";
 import { clampResolution, RESOLUTION_DESCRIPTORS } from "@/fluid/resolution";
 import type { FluidSettings } from "@/fluid/settings";
@@ -15,31 +21,48 @@ interface SliderRowProps {
 }
 
 const SliderRow = ({
-  descriptor: { label, min, max, step, precision },
+  descriptor,
   value,
   onChange,
   onCommit,
   onAbandon,
-}: SliderRowProps) => (
-  <label className="settings__row">
-    <span className="settings__label">{label}</span>
-    <input
-      type="range"
-      min={min}
-      max={max}
-      step={step}
-      value={value}
-      onChange={(event) => {
-        onChange(event.target.valueAsNumber);
-      }}
-      onPointerUp={onCommit}
-      onKeyUp={onCommit}
-      onBlur={onCommit}
-      onPointerCancel={onAbandon}
-    />
-    <output className="settings__value">{value.toFixed(precision)}</output>
-  </label>
-);
+}: SliderRowProps) => {
+  const { label, min, max, step, track } = descriptor;
+  const shown = formatSetting(descriptor, value);
+  const input =
+    track === "log"
+      ? {
+          min: 0,
+          max: LOG_TRACK_STEPS,
+          step: 1,
+          value: toTrackPosition(descriptor, value),
+          toSetting: (position: number) =>
+            fromTrackPosition(descriptor, position),
+        }
+      : { min, max, step, value, toSetting: (reported: number) => reported };
+
+  return (
+    <label className="settings__row">
+      <span className="settings__label">{label}</span>
+      <input
+        type="range"
+        min={input.min}
+        max={input.max}
+        step={input.step}
+        value={input.value}
+        aria-valuetext={shown}
+        onChange={(event) => {
+          onChange(input.toSetting(event.target.valueAsNumber));
+        }}
+        onPointerUp={onCommit}
+        onKeyUp={onCommit}
+        onBlur={onCommit}
+        onPointerCancel={onAbandon}
+      />
+      <output className="settings__value">{shown}</output>
+    </label>
+  );
+};
 
 interface ToggleRowProps {
   label: string;

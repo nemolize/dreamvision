@@ -12,6 +12,7 @@ import {
   freshPage,
   hideSettings,
   pinStrongSplats,
+  settleScale,
   settleSlider,
   stir,
   waitFrames,
@@ -422,15 +423,12 @@ test.describe("fluid canvas", () => {
   }) => {
     test.setTimeout(180_000);
 
-    const upwardShare = async (
-      gravity: string,
-      scale = "3",
-    ): Promise<number> => {
+    const upwardShare = async (gravity: string, scale = 3): Promise<number> => {
       await freshPage(page, "/?seed=off");
 
       await page.getByRole("button", { name: "Open settings" }).click();
       await settleSlider(page, "Gravity", gravity);
-      await settleSlider(page, "Scale", scale);
+      await settleScale(page, scale);
       await settleSlider(page, "Vorticity", "0");
       await cheapenGrids(page);
       await hideSettings(page);
@@ -449,7 +447,7 @@ test.describe("fluid canvas", () => {
     const weightless = await upwardShare("0");
     const lifted = await upwardShare("9.8");
     const sunk = await upwardShare("-9.8");
-    const wide = await upwardShare("9.8", "100");
+    const wide = await upwardShare("9.8", 100);
 
     // 0.05 is chosen empirically, no fixed source.
     expect(lifted - weightless).toBeGreaterThan(0.05);

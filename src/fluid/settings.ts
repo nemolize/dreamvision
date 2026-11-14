@@ -115,6 +115,7 @@ export const SETTING_DESCRIPTORS: readonly SettingDescriptor<
     max: 100,
     step: 0.01,
     precision: 2,
+    track: "log",
   },
   // Floor above zero: heat must always decay.
   {

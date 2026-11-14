@@ -1,5 +1,7 @@
 import { expect, type Locator, type Page, test } from "@playwright/test";
 
+import { LOG_TRACK_STEPS } from "@/fluid/descriptor";
+
 const outlineStyle = (locator: Locator): Promise<string> =>
   locator.evaluate((element) => getComputedStyle(element).outlineStyle);
 
@@ -146,5 +148,46 @@ test.describe("settings panel accessibility", () => {
         (element) => element.scrollHeight <= element.clientHeight,
       ),
     ).toBe(true);
+  });
+});
+
+const boxOf = async (
+  locator: Locator,
+): Promise<{ x: number; y: number; width: number; height: number }> => {
+  const box = await locator.boundingBox();
+  if (box === null) throw new Error("the element has no box");
+  return box;
+};
+
+test.describe("Scale slider", () => {
+  test("reaches both ends of its range and the small widths with a pointer", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    await page.getByRole("button", { name: "Open settings" }).click();
+    const slider = page.getByRole("slider", { name: "Scale" });
+    const box = await boxOf(slider);
+    const midY = box.y + box.height / 2;
+    const shown = async (): Promise<number> =>
+      Number(await slider.getAttribute("aria-valuetext"));
+
+    const share =
+      Number(await slider.inputValue()) /
+      Number(await slider.getAttribute("max"));
+    await expect(shown()).resolves.toBe(3);
+    expect(share).toBeGreaterThan(0.25);
+    expect(share).toBeLessThan(0.75);
+
+    await page.mouse.click(box.x + 1, midY);
+    await expect(slider).toHaveValue("0");
+    await expect.poll(shown).toBe(0.01);
+
+    await page.mouse.click(box.x + box.width - 1, midY);
+    await expect(slider).toHaveValue(String(LOG_TRACK_STEPS));
+    await expect.poll(shown).toBe(100);
+
+    await page.mouse.click(box.x + box.width * 0.3, midY);
+    await expect.poll(shown).toBeLessThan(0.3);
+    expect(await shown()).toBeGreaterThan(0.01);
   });
 });
