@@ -5,7 +5,7 @@ import renderShaderSource from "./render.wgsl?raw";
 describe("the display shader", () => {
   it("brightens the colour by the heat in the dye's alpha channel", () => {
     expect(renderShaderSource).toMatch(
-      /let colour = sampled\.rgb \* \(1\.0 \+ HEAT_GLOW \* sampled\.a\);/,
+      /let colour = sampled\.rgb \* \(1\.0 \+ displayParams\.glow \* sampled\.a\);/,
     );
   });
 
@@ -16,10 +16,10 @@ describe("the display shader", () => {
     );
   });
 
-  it("gives the glow a positive gain", () => {
-    const gain = /const HEAT_GLOW: f32 = ([\d.]+);/.exec(
-      renderShaderSource,
-    )?.[1];
-    expect(Number(gain)).toBeGreaterThan(0);
+  it("reads the glow gain from the display uniform, not a shader constant", () => {
+    expect(renderShaderSource).not.toMatch(/const HEAT_GLOW/);
+    expect(renderShaderSource).toMatch(
+      /@group\(0\) @binding\(1\) var<uniform> displayParams: DisplayParams;/,
+    );
   });
 });

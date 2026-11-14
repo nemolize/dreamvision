@@ -42,6 +42,11 @@ export const ADVECT_PARAM = {
   heatDissipation: 3,
 } as const;
 
+/** Float index of each `DisplayParams` member in `render.wgsl`. */
+export const DISPLAY_PARAM = {
+  glow: 0,
+} as const;
+
 /** One `vec4f` — the size every pass-parameter buffer is allocated at. */
 export const PARAM_FLOATS = 4;
 export const PARAM_BYTES = PARAM_FLOATS * 4;
@@ -86,6 +91,12 @@ export const packSplatUniforms = (
   target.set(splat.color, SPLAT_UNIFORM.color);
   target[SPLAT_UNIFORM.radius] = radius;
   target[SPLAT_UNIFORM.heat] = HEAT_PER_DYE * Math.max(...splat.color);
+};
+
+export const packDisplayParams = (glow: number): Float32Array => {
+  const values = new Float32Array(PARAM_FLOATS);
+  values[DISPLAY_PARAM.glow] = glow;
+  return values;
 };
 
 export const packAdvectParams = (

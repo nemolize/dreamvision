@@ -169,3 +169,18 @@ describe("showStats", () => {
     expect(normaliseSettings({ showStats: 1 }).showStats).toBe(false);
   });
 });
+
+describe("glow", () => {
+  it("defaults the heat glow to 4, also for a blob that predates it", () => {
+    expect(DEFAULT_SETTINGS.glow).toBe(4);
+    expect(normaliseSettings({}).glow).toBe(4);
+    expect(normaliseSettings({ glow: "x" }).glow).toBe(4);
+    expect(normaliseSettings({ glow: 2 }).glow).toBe(2);
+  });
+
+  it("clamps the heat glow into the slider's range, down to no glow at all", () => {
+    expect(clampSetting("glow", -1)).toBe(0);
+    expect(clampSetting("glow", 0)).toBe(0);
+    expect(clampSetting("glow", 1e6)).toBe(20);
+  });
+});

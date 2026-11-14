@@ -2,8 +2,11 @@
 
 @group(0) @binding(0) var dye: texture_2d<f32>;
 
-/// Brightness gained per unit of heat. Chosen empirically, no fixed source.
-const HEAT_GLOW: f32 = 4.0;
+struct DisplayParams {
+  glow: f32,
+}
+
+@group(0) @binding(1) var<uniform> displayParams: DisplayParams;
 
 struct VertexOutput {
   @builtin(position) position: vec4f,
@@ -49,7 +52,7 @@ fn sampleDye(uv: vec2f) -> vec4f {
 fn fragmentMain(in: VertexOutput) -> @location(0) vec4f {
   let sampled = sampleDye(in.uv);
   // Hot regions glow: heat brightens the colour it rides on.
-  let colour = sampled.rgb * (1.0 + HEAT_GLOW * sampled.a);
+  let colour = sampled.rgb * (1.0 + displayParams.glow * sampled.a);
   // The dye field is unbounded, so map it through a saturating curve rather
   // than clipping — bright cores keep their hue instead of going white. The
   // exponent lifts the mid-tones the plain curve leaves muddy.

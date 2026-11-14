@@ -5,7 +5,12 @@ import { DYE_FORMAT, PRESSURE_FORMAT, VELOCITY_FORMAT } from "./pipelines";
 import type { ProjectionScale } from "./projection";
 import { projectionScale } from "./projection";
 import type { FluidSettings } from "./settings";
-import { packAdvectParams, PARAM_BYTES, PARAM_FLOATS } from "./uniforms";
+import {
+  packAdvectParams,
+  packDisplayParams,
+  PARAM_BYTES,
+  PARAM_FLOATS,
+} from "./uniforms";
 
 const STORAGE_USAGE =
   GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING;
@@ -31,6 +36,7 @@ export interface Resources {
   ownedParamBuffers: readonly GPUBuffer[];
   advectVelocityParams: GPUBuffer;
   advectDyeParams: GPUBuffer;
+  displayParams: GPUBuffer;
   advectVelocity: FacePair;
   advectDye: ByVelocityThenDyeFace;
   splatVelocity: FacePair;
@@ -91,6 +97,7 @@ export const buildResources = (
   const advectDyeParams = makeParamBuffer(
     packAdvectParams(dyeGrid, settings.dyeDissipation, settings.heatCooling),
   );
+  const displayParams = makeParamBuffer(packDisplayParams(settings.glow));
   const splatVelocityParams = makeSplatParams(simGrid, 1);
   const splatDyeParams = makeSplatParams(dyeGrid, 0);
 
@@ -216,7 +223,10 @@ export const buildResources = (
   ];
 
   const display = perFace(dye, (read) =>
-    bindGroup(pipelines.renderLayout, [{ binding: 0, resource: read }]),
+    bindGroup(pipelines.renderLayout, [
+      { binding: 0, resource: read },
+      { binding: 1, resource: { buffer: displayParams } },
+    ]),
   );
 
   return {
@@ -231,11 +241,13 @@ export const buildResources = (
     ownedParamBuffers: [
       advectVelocityParams,
       advectDyeParams,
+      displayParams,
       splatVelocityParams,
       splatDyeParams,
     ],
     advectVelocityParams,
     advectDyeParams,
+    displayParams,
     advectVelocity,
     advectDye,
     splatVelocity,
