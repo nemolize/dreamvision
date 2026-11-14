@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { PRESSURE_ITERATIONS, SIM_RESOLUTION } from "./config";
+import { at, type Field, fieldFrom } from "./gridField.testing";
 import { projectionScale, projectionUniform } from "./projection";
 
 /**
@@ -15,25 +16,6 @@ import { projectionScale, projectionUniform } from "./projection";
  * twin here.
  */
 
-interface Field {
-  readonly width: number;
-  readonly height: number;
-  readonly data: Float64Array;
-}
-
-const field = (width: number, height: number): Field => ({
-  width,
-  height,
-  data: new Float64Array(width * height),
-});
-
-/** Reads outside the grid clamp to the edge, matching `loadAt`. */
-const at = (f: Field, x: number, y: number): number => {
-  const cx = Math.min(Math.max(x, 0), f.width - 1);
-  const cy = Math.min(Math.max(y, 0), f.height - 1);
-  return f.data[cy * f.width + cx] ?? 0;
-};
-
 const set = (f: Field, x: number, y: number, value: number): void => {
   f.data[y * f.width + x] = value;
 };
@@ -44,8 +26,8 @@ interface Velocity {
 }
 
 const velocity = (width: number, height: number): Velocity => ({
-  x: field(width, height),
-  y: field(width, height),
+  x: fieldFrom(width, height, () => 0),
+  y: fieldFrom(width, height, () => 0),
 });
 
 /**
@@ -56,33 +38,30 @@ const velocity = (width: number, height: number): Velocity => ({
 const divergence = (u: Velocity, wrap = false): Field => {
   const { width, height } = u.x;
   const scale = projectionScale(width, height);
-  const out = field(width, height);
+  const out = fieldFrom(width, height, () => 0);
 
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) {
       const centreX = at(u.x, x, y);
       const centreY = at(u.y, x, y);
 
-      const wrapped = (f: Field, dx: number, dy: number): number =>
-        at(f, (x + dx + width) % width, (y + dy + height) % height);
-
       const left = wrap
-        ? wrapped(u.x, -1, 0)
+        ? at(u.x, x - 1, y, true)
         : x === 0
           ? -centreX
           : at(u.x, x - 1, y);
       const right = wrap
-        ? wrapped(u.x, 1, 0)
+        ? at(u.x, x + 1, y, true)
         : x === width - 1
           ? -centreX
           : at(u.x, x + 1, y);
       const down = wrap
-        ? wrapped(u.y, 0, -1)
+        ? at(u.y, x, y - 1, true)
         : y === 0
           ? -centreY
           : at(u.y, x, y - 1);
       const up = wrap
-        ? wrapped(u.y, 0, 1)
+        ? at(u.y, x, y + 1, true)
         : y === height - 1
           ? -centreY
           : at(u.y, x, y + 1);
@@ -150,7 +129,7 @@ const neighbourSum = (p: Field, x: number, y: number): number =>
 
 /** The Laplacian the Jacobi sweep inverts, written out as an operator. */
 const laplacian = (p: Field): Field => {
-  const out = field(p.width, p.height);
+  const out = fieldFrom(p.width, p.height, () => 0);
   for (let y = 0; y < p.height; y++) {
     for (let x = 0; x < p.width; x++) {
       set(out, x, y, neighbourSum(p, x, y) - 4 * at(p, x, y));
@@ -161,7 +140,7 @@ const laplacian = (p: Field): Field => {
 
 /** One Jacobi sweep, transcribed from the `pressure` entry point. */
 const jacobiSweep = (p: Field, rhs: Field): Field => {
-  const out = field(p.width, p.height);
+  const out = fieldFrom(p.width, p.height, () => 0);
   for (let y = 0; y < p.height; y++) {
     for (let x = 0; x < p.width; x++) {
       set(out, x, y, (neighbourSum(p, x, y) - at(rhs, x, y)) * 0.25);
@@ -171,7 +150,7 @@ const jacobiSweep = (p: Field, rhs: Field): Field => {
 };
 
 const solvePressure = (rhs: Field, sweeps: number): Field => {
-  let p = field(rhs.width, rhs.height);
+  let p = fieldFrom(rhs.width, rhs.height, () => 0);
   for (let i = 0; i < sweeps; i++) p = jacobiSweep(p, rhs);
   return p;
 };
@@ -190,7 +169,7 @@ const l2Interior = (f: Field): number => {
 
 /** `|a - b| / |b|` over the interior, for how closely two fields agree. */
 const relativeDifference = (a: Field, b: Field): number => {
-  const difference = field(a.width, a.height);
+  const difference = fieldFrom(a.width, a.height, () => 0);
   for (let i = 0; i < difference.data.length; i++) {
     difference.data[i] = (a.data[i] ?? 0) - (b.data[i] ?? 0);
   }
@@ -336,7 +315,7 @@ describe("the discrete operators", () => {
     // A unit ramp differentiates to 1 per cell; one stored unit of vx spans 40
     // cells here, so the correction is 1/40. Reversing it gives 40. The literal
     // is deliberate — asserting against `projectionScale` would pass either way.
-    const p = field(40, 10);
+    const p = fieldFrom(40, 10, () => 0);
     fillField(p, (x) => x);
 
     const g = gradient(p);
@@ -348,7 +327,7 @@ describe("the discrete operators", () => {
     // #681's second defect, pinned as the gap it currently is: a central
     // difference on both sides composes to a 2-cell Laplacian, not the 1-cell
     // operator the sweep solves. Fixing the stencils flips this assertion.
-    const p = field(24, 14);
+    const p = fieldFrom(24, 14, () => 0);
     fillField(p, (x, y) => Math.sin(x * 0.3) * Math.cos(y * 0.45));
 
     expect(
@@ -359,7 +338,7 @@ describe("the discrete operators", () => {
 
 describe("the Jacobi sweep", () => {
   it("leaves the exact solution where it is", () => {
-    const p = field(20, 12);
+    const p = fieldFrom(20, 12, () => 0);
     fillField(p, (x, y) => Math.sin(x * 0.4) * Math.sin(y * 0.6));
 
     expect(relativeDifference(jacobiSweep(p, laplacian(p)), p)).toBeLessThan(
@@ -369,14 +348,14 @@ describe("the Jacobi sweep", () => {
 
   /** Sweep a starting error towards the zero solution and report what remains. */
   const surviving = (start: Field, sweeps: number): number => {
-    const zero = field(start.width, start.height);
+    const zero = fieldFrom(start.width, start.height, () => 0);
     let current = start;
     for (let i = 0; i < sweeps; i++) current = jacobiSweep(current, zero);
     return l2Interior(current) / l2Interior(start);
   };
 
   const checkerboard = (width: number, height: number): Field => {
-    const f = field(width, height);
+    const f = fieldFrom(width, height, () => 0);
     fillField(f, (x, y) => ((x + y) % 2 === 0 ? 1 : -1));
     return f;
   };
@@ -517,7 +496,7 @@ describe("the projection as a whole", () => {
     const width = 64;
     const height = 32;
 
-    const potential = field(width, height);
+    const potential = fieldFrom(width, height, () => 0);
     fillField(
       potential,
       (x, y) => Math.sin((x / width) * 3) * Math.cos((y / height) * 3),

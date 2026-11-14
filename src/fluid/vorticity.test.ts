@@ -1,38 +1,11 @@
 import { describe, expect, it } from "vitest";
 
+import { at, type Field, fieldFrom } from "./gridField.testing";
 import { projectionScale } from "./projection";
 import simulationShaderSource from "./simulation.wgsl?raw";
 
 // CPU twin of the `curl` and `confine` passes, transcribed by hand: editing
 // either pass in `simulation.wgsl` means editing its twin here.
-
-interface Field {
-  readonly width: number;
-  readonly height: number;
-  readonly data: Float64Array;
-}
-
-const fieldFrom = (
-  width: number,
-  height: number,
-  value: (x: number, y: number) => number,
-): Field => {
-  const data = new Float64Array(width * height);
-  for (let y = 0; y < height; y++) {
-    for (let x = 0; x < width; x++) data[y * width + x] = value(x, y);
-  }
-  return { width, height, data };
-};
-
-const at = (f: Field, x: number, y: number, wrap: boolean): number => {
-  const cx = wrap
-    ? ((x % f.width) + f.width) % f.width
-    : Math.min(Math.max(x, 0), f.width - 1);
-  const cy = wrap
-    ? ((y % f.height) + f.height) % f.height
-    : Math.min(Math.max(y, 0), f.height - 1);
-  return f.data[cy * f.width + cx] ?? 0;
-};
 
 interface Velocity {
   readonly x: Field;
