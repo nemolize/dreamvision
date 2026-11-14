@@ -1,3 +1,5 @@
+// `at` and `sample` are the CPU twins of `loadAt` and `sampleAt` in `simulation.wgsl`.
+
 export interface Field {
   readonly width: number;
   readonly height: number;

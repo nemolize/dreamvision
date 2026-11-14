@@ -45,26 +45,23 @@ const divergence = (u: Velocity, wrap = false): Field => {
       const centreX = at(u.x, x, y);
       const centreY = at(u.y, x, y);
 
-      const wrapped = (f: Field, dx: number, dy: number): number =>
-        at(f, (x + dx + width) % width, (y + dy + height) % height);
-
       const left = wrap
-        ? wrapped(u.x, -1, 0)
+        ? at(u.x, x - 1, y, true)
         : x === 0
           ? -centreX
           : at(u.x, x - 1, y);
       const right = wrap
-        ? wrapped(u.x, 1, 0)
+        ? at(u.x, x + 1, y, true)
         : x === width - 1
           ? -centreX
           : at(u.x, x + 1, y);
       const down = wrap
-        ? wrapped(u.y, 0, -1)
+        ? at(u.y, x, y - 1, true)
         : y === 0
           ? -centreY
           : at(u.y, x, y - 1);
       const up = wrap
-        ? wrapped(u.y, 0, 1)
+        ? at(u.y, x, y + 1, true)
         : y === height - 1
           ? -centreY
           : at(u.y, x, y + 1);

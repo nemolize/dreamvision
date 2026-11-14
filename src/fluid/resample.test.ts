@@ -10,7 +10,7 @@ import { type Field, fieldFrom, sample } from "./gridField.testing";
  * assertion below.
  *
  * Transcribed by hand, so this checks the mapping, not the shader: editing
- * `resample` or `sampleAt` means editing its twin here.
+ * `resample` means editing its twin here.
  */
 
 const resample = (source: Field, width: number, height: number): Field =>
