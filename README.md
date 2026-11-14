@@ -95,7 +95,9 @@ its colour, advection carries it with the dye, and its own cooling rate fades
 it. A `buoyancy` pass between the confinement and the projection lifts hot
 cells along the up direction, which follows the device's gravity reading
 (rotated by the screen's orientation and smoothed) and points up the screen
-when there is none. On iOS Safari the motion permission is requested on the
+when there is none. The lift is scaled by the share of that reading lying in
+the screen plane, so it is full when the screen is upright, fades towards
+nothing as the device lies flat, and stays full without a reading. On iOS Safari the motion permission is requested on the
 first pointer release. The heat is the temperature excess over the
 surroundings as a fraction, `h = (T − T₀) / T₀`. The Boussinesq form divides the
 density deficit by the surroundings' density, so an ideal gas rises at

@@ -6,7 +6,11 @@ import { watchGravity } from "./gravityInput";
 const G = 9.8;
 
 const motion = (
-  accelerationIncludingGravity: { x: number | null; y: number | null } | null,
+  accelerationIncludingGravity: {
+    x: number | null;
+    y: number | null;
+    z?: number | null;
+  } | null,
 ): Event =>
   Object.assign(new Event("devicemotion"), { accelerationIncludingGravity });
 
@@ -44,6 +48,15 @@ describe("the devicemotion listener", () => {
     const { tracker, watch } = watched();
     window.dispatchEvent(motion({ x: G, y: 0 }));
     expect(tracker.step(100)[0]).toBeCloseTo(1, 6);
+    watch.dispose();
+  });
+
+  it("passes the reading's z on, so a tilted device lifts less", () => {
+    const { tracker, watch } = watched();
+    window.dispatchEvent(motion({ x: 0, y: 3, z: 4 }));
+    const [x, y] = tracker.step(100);
+    expect(x).toBeCloseTo(0, 6);
+    expect(y).toBeCloseTo(-0.6, 6);
     watch.dispose();
   });
 
