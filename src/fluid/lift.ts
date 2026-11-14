@@ -1,5 +1,5 @@
 export const gravityInCells = (
   gravity: number,
-  widthMetres: number,
+  longSideMetres: number,
   cells: number,
-): number => (gravity * cells) / widthMetres;
+): number => (gravity * cells) / longSideMetres;

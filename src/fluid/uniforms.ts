@@ -76,7 +76,7 @@ export const packUniforms = (
   target[UNIFORM.gravityCells] = gravityInCells(
     gravity,
     sceneWidth,
-    simGrid.width,
+    Math.max(simGrid.width, simGrid.height),
   );
   target.set(up, UNIFORM.up);
 };

@@ -113,7 +113,7 @@ export const SETTING_DESCRIPTORS: readonly SettingDescriptor<
   },
   {
     key: "sceneWidth",
-    label: "Scale (m)",
+    label: "Scale (m, long side)",
     min: 0.01,
     max: 100,
     step: 0.01,
