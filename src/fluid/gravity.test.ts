@@ -5,6 +5,7 @@ import {
   DEFAULT_UP,
   easeDirection,
   GravityTracker,
+  inPlaneShare,
   upFromReading,
 } from "./gravity";
 
@@ -47,6 +48,34 @@ describe("upFromReading", () => {
     expect(upFromReading({ x: 5, y: null }, 0)).toBeNull();
     expect(upFromReading({ x: Number.NaN, y: 5 }, 0)).toBeNull();
     expect(upFromReading({ x: 5, y: Infinity }, 0)).toBeNull();
+  });
+});
+
+describe("inPlaneShare", () => {
+  it("is 1 for a device held upright and 0 for one lying flat", () => {
+    expect(inPlaneShare({ x: 0, y: G, z: 0 })).toBeCloseTo(1, 9);
+    expect(inPlaneShare({ x: 0, y: 0, z: G })).toBe(0);
+  });
+
+  it("is the sine of the tilt in between, whatever the gravity's size", () => {
+    const tilt = Math.PI / 6;
+    expect(
+      inPlaneShare({ x: 0, y: G * Math.sin(tilt), z: G * Math.cos(tilt) }),
+    ).toBeCloseTo(0.5, 9);
+    expect(inPlaneShare({ x: 0, y: 3, z: 4 })).toBeCloseTo(0.6, 9);
+  });
+
+  it("counts a reading without a usable z as fully in the plane", () => {
+    expect(inPlaneShare({ x: 0, y: 2 })).toBe(1);
+    expect(inPlaneShare({ x: 0, y: 2, z: null })).toBe(1);
+    expect(inPlaneShare({ x: 0, y: 2, z: Number.NaN })).toBe(1);
+  });
+
+  it("has no share for a reading that is missing, not finite or all zero", () => {
+    expect(inPlaneShare(null)).toBeNull();
+    expect(inPlaneShare({ x: null, y: 5, z: 1 })).toBeNull();
+    expect(inPlaneShare({ x: 5, y: Infinity, z: 1 })).toBeNull();
+    expect(inPlaneShare({ x: 0, y: 0, z: 0 })).toBeNull();
   });
 });
 
@@ -127,5 +156,35 @@ describe("GravityTracker", () => {
     const [x] = tracker.step(1 / 60);
     expect(x).toBeGreaterThan(0);
     expect(x).toBeLessThan(0.5);
+  });
+
+  it("lifts with the full share before any reading and for a reading without z", () => {
+    const tracker = new GravityTracker();
+    tracker.update({ x: 0, y: 2 }, 0);
+    expect(tracker.step(100)).toEqual(close(0, -1));
+  });
+
+  it("scales the direction by the share of gravity in the screen plane", () => {
+    const tracker = new GravityTracker();
+    tracker.update({ x: 0, y: 3, z: 4 }, 0);
+    expect(tracker.step(100)).toEqual(close(0, -0.6));
+  });
+
+  it("fades the lift to nothing for a device lying flat, keeping the last direction", () => {
+    const tracker = new GravityTracker();
+    tracker.update({ x: G, y: 0, z: 0 }, 0);
+    tracker.step(100);
+    tracker.update({ x: 0, y: 0, z: G }, 0);
+    const [part] = tracker.step(GRAVITY_SMOOTHING_SECONDS);
+    expect(part).toBeGreaterThan(0);
+    expect(part).toBeLessThan(1);
+    expect(tracker.step(100)).toEqual(close(0, 0));
+  });
+
+  it("keeps the last share through an unusable reading", () => {
+    const tracker = new GravityTracker();
+    tracker.update({ x: 0, y: 3, z: 4 }, 0);
+    tracker.update(null, 0);
+    expect(tracker.step(100)).toEqual(close(0, -0.6));
   });
 });
