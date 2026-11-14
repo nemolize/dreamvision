@@ -258,14 +258,18 @@ describe("FluidCanvas teardown", () => {
     view.unmount();
 
     expect(canvasAdd.mock.calls.map(([type]) => type).sort()).toEqual([
+      "contextmenu",
       "keydown",
       "lostpointercapture",
       "pointercancel",
       "pointerdown",
       "pointermove",
       "pointerup",
+      "touchstart",
     ]);
-    expect(canvasRemove.mock.calls).toEqual(canvasAdd.mock.calls);
+    expect(canvasRemove.mock.calls).toEqual(
+      canvasAdd.mock.calls.map(([type, listener]) => [type, listener]),
+    );
     expect(documentRemove.mock.calls).toEqual(
       documentAdd.mock.calls.filter(([type]) => type === "visibilitychange"),
     );
@@ -519,6 +523,20 @@ describe("FluidCanvas frame loop", () => {
     expect(capture.set).toHaveBeenCalledWith(1);
     expect(capture.release).toHaveBeenCalledWith(1);
     expect(splatsOfFrame(renderer, 2)).toEqual([]);
+  });
+
+  it("cancels the long-press gesture without disturbing the pointer handlers", async () => {
+    await mount();
+    const canvas = getCanvas();
+
+    expect(fireEvent.touchStart(canvas)).toBe(false);
+    expect(fireEvent.contextMenu(canvas)).toBe(false);
+    fireEvent.pointerDown(canvas, { pointerId: 1, clientX: 10, clientY: 10 });
+    fireEvent.pointerMove(canvas, { pointerId: 1, clientX: 30, clientY: 20 });
+    runFrame();
+
+    expect(splatsOfFrame(onlyRenderer(), 0)).toHaveLength(1);
+    expect(capture.set).toHaveBeenCalledWith(1);
   });
 
   it("rises toward the top of the screen until the device reports a gravity", async () => {

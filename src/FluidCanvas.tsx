@@ -94,6 +94,10 @@ export const FluidCanvas = () => {
       pointer.release(event.pointerId);
     };
 
+    const cancelLongPress = (event: Event): void => {
+      event.preventDefault();
+    };
+
     let meter: StatsMeter | null = null;
 
     const onVisibilityChange = (): void => {
@@ -172,6 +176,10 @@ export const FluidCanvas = () => {
       canvas.addEventListener("pointercancel", onPointerUp);
       canvas.addEventListener("lostpointercapture", onLostPointerCapture);
       canvas.addEventListener("keydown", onKeyDown);
+      canvas.addEventListener("touchstart", cancelLongPress, {
+        passive: false,
+      });
+      canvas.addEventListener("contextmenu", cancelLongPress);
       document.addEventListener("visibilitychange", onVisibilityChange);
       motionQuery?.addEventListener?.("change", onMotionPreferenceChange);
       observer.observe(canvas);
@@ -233,6 +241,8 @@ export const FluidCanvas = () => {
       canvas.removeEventListener("pointercancel", onPointerUp);
       canvas.removeEventListener("lostpointercapture", onLostPointerCapture);
       canvas.removeEventListener("keydown", onKeyDown);
+      canvas.removeEventListener("touchstart", cancelLongPress);
+      canvas.removeEventListener("contextmenu", cancelLongPress);
       gravityWatch.dispose();
       document.removeEventListener("visibilitychange", onVisibilityChange);
       motionQuery?.removeEventListener?.("change", onMotionPreferenceChange);
