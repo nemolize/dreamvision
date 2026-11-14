@@ -23,10 +23,11 @@ export const DYE_DISSIPATION = 0.1;
 
 /** Strength of the vorticity confinement pass: cells per second of velocity
  * added per second, per unit of curl. 0 switches the pass off. */
-export const VORTICITY_CONFINEMENT = 10;
+export const VORTICITY_CONFINEMENT = 5;
 
-/** Cells per second squared of lift per unit of heat; 0 switches the pass off. */
-export const BUOYANCY_STRENGTH = 10;
+export const EARTH_GRAVITY = 9.8;
+
+export const SCENE_WIDTH_METRES = 3;
 
 export const HEAT_COOLING = 1;
 

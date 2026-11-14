@@ -1,8 +1,9 @@
 import {
-  BUOYANCY_STRENGTH,
   DYE_DISSIPATION,
+  EARTH_GRAVITY,
   HEAT_COOLING,
   PRESSURE_ITERATIONS,
+  SCENE_WIDTH_METRES,
   SPLAT_FORCE,
   SPLAT_RADIUS,
   VELOCITY_DISSIPATION,
@@ -20,7 +21,8 @@ export interface NumericSettings {
   splatForce: number;
   pressureIterations: number;
   vorticityConfinement: number;
-  buoyancy: number;
+  gravity: number;
+  sceneWidth: number;
   heatCooling: number;
 }
 
@@ -36,7 +38,8 @@ const NUMERIC_DEFAULTS: NumericSettings = {
   splatForce: SPLAT_FORCE,
   pressureIterations: PRESSURE_ITERATIONS,
   vorticityConfinement: VORTICITY_CONFINEMENT,
-  buoyancy: BUOYANCY_STRENGTH,
+  gravity: EARTH_GRAVITY,
+  sceneWidth: SCENE_WIDTH_METRES,
   heatCooling: HEAT_COOLING,
 };
 
@@ -98,12 +101,20 @@ export const SETTING_DESCRIPTORS: readonly SettingDescriptor<
     precision: 0,
   },
   {
-    key: "buoyancy",
-    label: "Buoyancy",
-    min: 0,
+    key: "gravity",
+    label: "Gravity (m/s²)",
+    min: -100,
     max: 100,
-    step: 1,
-    precision: 0,
+    step: 0.1,
+    precision: 1,
+  },
+  {
+    key: "sceneWidth",
+    label: "Scale (m)",
+    min: 0.01,
+    max: 100,
+    step: 0.01,
+    precision: 2,
   },
   // Floor above zero: heat must always decay.
   {

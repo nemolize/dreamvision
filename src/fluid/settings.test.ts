@@ -64,10 +64,24 @@ describe("normaliseSettings", () => {
     expect(clampSetting("vorticityConfinement", 1e6)).toBe(50);
   });
 
-  it("lets the buoyancy strength reach zero, which switches the pass off", () => {
-    expect(clampSetting("buoyancy", 0)).toBe(0);
-    expect(clampSetting("buoyancy", -3)).toBe(0);
-    expect(clampSetting("buoyancy", 1e6)).toBe(100);
+  it("keeps the scene width above zero, so a cell always has a size", () => {
+    expect(clampSetting("sceneWidth", 0)).toBe(0.01);
+    expect(clampSetting("sceneWidth", -3)).toBe(0.01);
+    expect(clampSetting("sceneWidth", 1e6)).toBe(100);
+  });
+
+  it("lets gravity run from -100 to 100, through zero, which switches the lift off", () => {
+    expect(clampSetting("gravity", 0)).toBe(0);
+    expect(clampSetting("gravity", -3)).toBe(-3);
+    expect(clampSetting("gravity", -1e6)).toBe(-100);
+    expect(clampSetting("gravity", 1e6)).toBe(100);
+  });
+
+  it("defaults gravity to Earth's surface value, also for a blob that predates it", () => {
+    expect(DEFAULT_SETTINGS.gravity).toBe(9.8);
+    expect(normaliseSettings({ splatForce: 40 }).gravity).toBe(9.8);
+    expect(normaliseSettings({ gravity: "x" }).gravity).toBe(9.8);
+    expect(normaliseSettings({ gravity: 3 }).gravity).toBe(3);
   });
 
   it("keeps the cooling rate above zero, so heat always decays", () => {
@@ -75,15 +89,19 @@ describe("normaliseSettings", () => {
     expect(clampSetting("heatCooling", -1)).toBeGreaterThan(0);
   });
 
-  it("keeps a stored buoyancy and cooling rate, and defaults a blob that predates them", () => {
-    expect(normaliseSettings({ buoyancy: 40, heatCooling: 2 })).toMatchObject({
-      buoyancy: 40,
+  it("keeps a stored scene width and cooling rate, and defaults a blob that predates them", () => {
+    expect(normaliseSettings({ sceneWidth: 5, heatCooling: 2 })).toMatchObject({
+      sceneWidth: 5,
       heatCooling: 2,
     });
     expect(normaliseSettings({ splatForce: 50 })).toMatchObject({
-      buoyancy: DEFAULT_SETTINGS.buoyancy,
+      sceneWidth: DEFAULT_SETTINGS.sceneWidth,
       heatCooling: DEFAULT_SETTINGS.heatCooling,
     });
+  });
+
+  it("drops a stored buoyancy, which no longer exists", () => {
+    expect(normaliseSettings({ buoyancy: 40 })).toEqual(DEFAULT_SETTINGS);
   });
 
   it("clamps an out-of-range stored value", () => {

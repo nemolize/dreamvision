@@ -179,7 +179,8 @@ export const createFluidRenderer = (
       dt,
       settings.wrapEdges,
       settings.vorticityConfinement,
-      settings.buoyancy,
+      settings.gravity,
+      settings.sceneWidth,
       up,
     );
     device.queue.writeBuffer(uniformBuffer, 0, uniformData);
@@ -209,7 +210,7 @@ export const createFluidRenderer = (
       splatSlotBytes,
       pressureIterations: settings.pressureIterations,
       vorticityConfinement: settings.vorticityConfinement,
-      buoyancy: settings.buoyancy,
+      gravity: settings.gravity,
       timing,
     });
 

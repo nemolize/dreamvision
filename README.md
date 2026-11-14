@@ -96,8 +96,15 @@ it. A `buoyancy` pass between the confinement and the projection lifts hot
 cells along the up direction, which follows the device's gravity reading
 (rotated by the screen's orientation and smoothed) and points up the screen
 when there is none. On iOS Safari the motion permission is requested on the
-first pointer release. `buoyancy.test.ts` checks the lift on the CPU, and a
-strength of 0 skips the pass.
+first pointer release. The heat is the temperature excess over the
+surroundings as a fraction, `h = (T − T₀) / T₀`. The Boussinesq form divides the
+density deficit by the surroundings' density, so an ideal gas rises at
+`a = g · h / (1 + h)`, never above `g`. The `Gravity` setting is `g` in m/s²,
+and a negative value sinks the hot dye. The `Scale` setting is how many metres
+the canvas width stands for; it converts that acceleration into cells per second
+squared, so a wider canvas reads as a slower lift. It scales the lift only:
+pointer drags, vorticity and decay do not follow it. `buoyancy.test.ts` checks
+the lift on the CPU, and a gravity of 0 skips the pass.
 
 One deviation from a textbook solver remains: `divergence` and
 `gradientSubtract` use central differences while the Jacobi sweep solves a
@@ -114,9 +121,9 @@ the options are in
 
 ### The settings panel
 
-The gear opens ten sliders over the running canvas. The eight solver settings
+The gear opens eleven sliders over the running canvas. The nine solver settings
 reach the running frame as the slider moves; the two grid resolutions wait for
-the drag to end, for the reason the next section gives. All ten are stored, so
+the drag to end, for the reason the next section gives. All eleven are stored, so
 the next load opens where you left it.
 
 The `Frame stats` checkbox, off by default, shows the frame rate and the GPU time

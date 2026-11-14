@@ -14,7 +14,7 @@ export interface FrameEncode {
   splatSlotBytes: number;
   pressureIterations: number;
   vorticityConfinement: number;
-  buoyancy: number;
+  gravity: number;
   timing: FrameTiming | null;
 }
 
@@ -29,7 +29,7 @@ export const encodeFrame = ({
   splatSlotBytes,
   pressureIterations,
   vorticityConfinement,
-  buoyancy,
+  gravity,
   timing,
 }: FrameEncode): void => {
   const { simGrid, dyeGrid, velocity, dye, pressure } = resources;
@@ -86,7 +86,7 @@ export const encodeFrame = ({
     velocity.swap();
   }
 
-  if (buoyancy > 0) {
+  if (gravity !== 0) {
     run(
       pipelines.buoyancy,
       resources.buoyancyPass[velocity.readFace][dye.readFace],

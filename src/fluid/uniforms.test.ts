@@ -99,7 +99,8 @@ describe("packUniforms", () => {
   const pack = (
     wrapEdges = false,
     vorticity = 0,
-    buoyancy = 0,
+    gravity = 0,
+    sceneWidth = 1,
     up: readonly [number, number] = [0, -1],
   ): Float32Array => {
     const target = new Float32Array(UNIFORM_FLOATS);
@@ -111,7 +112,8 @@ describe("packUniforms", () => {
       1 / 60,
       wrapEdges,
       vorticity,
-      buoyancy,
+      gravity,
+      sceneWidth,
       up,
     );
     return target;
@@ -126,12 +128,16 @@ describe("packUniforms", () => {
     expect(pack(false, 37)[UNIFORM.vorticity]).toBe(37);
   });
 
-  it("writes the buoyancy strength into its own member", () => {
-    expect(pack(false, 0, 23)[UNIFORM.buoyancy]).toBe(23);
+  it("writes the gravity in cells per second squared, counted on the simulation grid", () => {
+    expect(pack(false, 0, 9.8, 4)[UNIFORM.gravityCells]).toBeCloseTo(
+      (9.8 * 64) / 4,
+      4,
+    );
+    expect(pack(false, 0, 0, 4)[UNIFORM.gravityCells]).toBe(0);
   });
 
   it("writes the up direction as an x, y pair", () => {
-    const packed = pack(false, 0, 0, [0.6, -0.8]);
+    const packed = pack(false, 0, 0, 1, [0.6, -0.8]);
     expect(packed[UNIFORM.up]).toBeCloseTo(0.6, 6);
     expect(packed[UNIFORM.up + 1]).toBeCloseTo(-0.8, 6);
   });
@@ -171,6 +177,7 @@ describe("packUniforms", () => {
       projectionScale(8, 8),
       1,
       true,
+      1,
       1,
       1,
       [0, -1],

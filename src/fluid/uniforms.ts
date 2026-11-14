@@ -1,5 +1,6 @@
 import { HEAT_PER_DYE } from "./config";
 import type { Grid } from "./grid";
+import { gravityInCells } from "./lift";
 import type { ProjectionScale } from "./projection";
 import { projectionUniform } from "./projection";
 import type { Splat } from "./types";
@@ -13,7 +14,7 @@ export const UNIFORM = {
   toStored: 6,
   wrapEdges: 8,
   vorticity: 9,
-  buoyancy: 10,
+  gravityCells: 10,
   up: 12,
 } as const;
 
@@ -55,7 +56,8 @@ export const packUniforms = (
   dt: number,
   wrapEdges: boolean,
   vorticity: number,
-  buoyancy: number,
+  gravity: number,
+  sceneWidth: number,
   up: readonly [number, number],
 ): void => {
   target.set([simGrid.width, simGrid.height], UNIFORM.simSize);
@@ -66,7 +68,11 @@ export const packUniforms = (
   target.set(metric.toStored, UNIFORM.toStored);
   target[UNIFORM.wrapEdges] = wrapEdges ? 1 : 0;
   target[UNIFORM.vorticity] = vorticity;
-  target[UNIFORM.buoyancy] = buoyancy;
+  target[UNIFORM.gravityCells] = gravityInCells(
+    gravity,
+    sceneWidth,
+    simGrid.width,
+  );
   target.set(up, UNIFORM.up);
 };
 
