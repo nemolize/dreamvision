@@ -31,6 +31,9 @@ export const SCENE_WIDTH_METRES = 3;
 
 export const HEAT_COOLING = 1;
 
+/** Brightness gained per unit of heat. Chosen empirically, no fixed source. */
+export const HEAT_GLOW = 4;
+
 export const HEAT_PER_DYE = 0.2;
 
 /** Screen-plane magnitude in m/s² below which a reading has no usable direction. Chosen empirically. */

@@ -54,7 +54,7 @@ test.describe("fluid canvas", () => {
     await page.getByRole("button", { name: "Open settings" }).click();
 
     await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
-    await expect(page.getByRole("slider")).toHaveCount(11);
+    await expect(page.getByRole("slider")).toHaveCount(12);
   });
 
   test("restores a changed setting after a reload, and drops it on reset", async ({
@@ -152,6 +152,41 @@ test.describe("fluid canvas", () => {
 
     expect(slow).toBeGreaterThan(0.5);
     expect(fast).toBeLessThan(0.2);
+  });
+
+  test("carries the glow slider through to the running frame", async ({
+    page,
+  }) => {
+    test.setTimeout(180_000);
+
+    await freshPage(page, "/?seed=off");
+
+    await page.getByRole("button", { name: "Open settings" }).click();
+    await page.getByRole("slider", { name: "Dye decay" }).fill("0");
+    await page.getByRole("slider", { name: "Heat cooling" }).fill("0.05");
+    await cheapenGrids(page);
+    await pinStrongSplats(page);
+    await settleSlider(page, "Glow", "0");
+
+    const viewport = page.viewportSize() ?? { width: 1280, height: 720 };
+    await stir(page, viewport);
+    await waitFrames(page, 10);
+
+    // Off, on, off again: a read only the glow can raise above both its
+    // neighbours, where a monotone drift (cooling, spreading) never could.
+    const before = await whileHidden(page, () => meanBrightness(page));
+    expect(before).toBeGreaterThan(0);
+
+    await settleSlider(page, "Glow", "20");
+    await waitFrames(page, 2);
+    const lit = await whileHidden(page, () => meanBrightness(page));
+
+    await settleSlider(page, "Glow", "0");
+    await waitFrames(page, 2);
+    const after = await whileHidden(page, () => meanBrightness(page));
+
+    expect(lit).toBeGreaterThan(before * 1.1);
+    expect(lit).toBeGreaterThan(after * 1.1);
   });
 
   test("carries both fields across a resolution change instead of blanking them", async ({

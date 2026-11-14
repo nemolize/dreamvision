@@ -109,6 +109,10 @@ squared, so a wider canvas reads as a slower lift. It scales the lift only:
 pointer drags, vorticity and decay do not follow it. `buoyancy.test.ts` checks
 the lift on the CPU, and a gravity of 0 skips the pass.
 
+The display pass brightens each cell's colour by `1 + glow · heat` before the
+tone-mapping curve. The `Glow` setting is that `glow` gain: 0 draws the dye with
+no heat glow, and the default of 4 is the look before the setting existed.
+
 One deviation from a textbook solver remains: `divergence` and
 `gradientSubtract` use central differences while the Jacobi sweep solves a
 1-cell Laplacian, so the sweep does not invert the operator whose divergence it
@@ -124,9 +128,9 @@ the options are in
 
 ### The settings panel
 
-The gear opens eleven sliders over the running canvas. The nine solver settings
+The gear opens twelve sliders over the running canvas. The ten solver settings
 reach the running frame as the slider moves; the two grid resolutions wait for
-the drag to end, for the reason the next section gives. All eleven are stored, so
+the drag to end, for the reason the next section gives. All twelve are stored, so
 the next load opens where you left it.
 
 The `Frame stats` checkbox, off by default, shows the frame rate and the GPU time

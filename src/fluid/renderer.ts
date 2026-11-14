@@ -17,6 +17,7 @@ import { DEFAULT_SETTINGS } from "./settings";
 import type { FluidRenderer, Splat } from "./types";
 import {
   ADVECT_PARAM,
+  packDisplayParams,
   packSplatUniforms,
   packUniforms,
   SPLAT_UNIFORM_BYTES,
@@ -162,6 +163,11 @@ export const createFluidRenderer = (
       resources.advectDyeParams,
       next.dyeDissipation,
       next.heatCooling,
+    );
+    device.queue.writeBuffer(
+      resources.displayParams,
+      0,
+      packDisplayParams(next.glow),
     );
   };
 

@@ -144,6 +144,11 @@ export const createPipelines = (
         visibility: GPUShaderStage.FRAGMENT,
         texture: { sampleType: "unfilterable-float" },
       },
+      {
+        binding: 1,
+        visibility: GPUShaderStage.FRAGMENT,
+        buffer: { type: "uniform" },
+      },
     ],
   });
 

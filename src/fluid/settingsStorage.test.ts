@@ -57,6 +57,11 @@ describe("loadSettings", () => {
     });
   });
 
+  it("persists the glow", () => {
+    saveSettings({ ...DEFAULT_SETTINGS, glow: 7.5 });
+    expect(loadSettings()).toMatchObject({ glow: 7.5 });
+  });
+
   it("persists the frame-stats toggle", () => {
     saveSettings({ ...DEFAULT_SETTINGS, showStats: true });
     expect(loadSettings().showStats).toBe(true);

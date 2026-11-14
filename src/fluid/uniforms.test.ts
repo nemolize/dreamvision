@@ -2,11 +2,14 @@ import { describe, expect, it } from "vitest";
 
 import { HEAT_PER_DYE } from "./config";
 import { projectionScale } from "./projection";
+import renderShaderSource from "./render.wgsl?raw";
 import simulationShaderSource from "./simulation.wgsl?raw";
 import type { Splat } from "./types";
 import {
   ADVECT_PARAM,
+  DISPLAY_PARAM,
   packAdvectParams,
+  packDisplayParams,
   packSplatUniforms,
   packUniforms,
   PARAM_FLOATS,
@@ -36,9 +39,12 @@ const isPadding = (name: string): boolean => name.startsWith("_pad");
 
 /** Fails loudly on an unknown type or a missing struct: silently returning a
  * partial layout would let the assertions below pass while checking less. */
-const wgslStruct = (name: string): Record<string, number> => {
+const wgslStruct = (
+  name: string,
+  source = simulationShaderSource,
+): Record<string, number> => {
   const body = new RegExp(`\\bstruct\\s+${name}\\s*\\{([^}]*)\\}`).exec(
-    simulationShaderSource,
+    source,
   )?.[1];
   if (body === undefined) throw new Error(`no struct ${name} in the shader`);
 
@@ -64,6 +70,7 @@ const wgslStruct = (name: string): Record<string, number> => {
 const UNIFORMS_STRUCT = wgslStruct("Uniforms");
 const SPLAT_UNIFORMS_STRUCT = wgslStruct("SplatUniforms");
 const ADVECT_PARAMS_STRUCT = wgslStruct("AdvectParams");
+const DISPLAY_PARAMS_STRUCT = wgslStruct("DisplayParams", renderShaderSource);
 
 const vec2f = FLOATS["vec2f"] ?? 0;
 const vec4f = FLOATS["vec4f"] ?? 0;
@@ -185,6 +192,18 @@ describe("packUniforms", () => {
     for (const offset of Object.values(UNIFORM)) {
       expect(target[offset]).not.toBeNaN();
     }
+  });
+});
+
+describe("DISPLAY_PARAM", () => {
+  it("places every member where the render shader reads it", () => {
+    expect(DISPLAY_PARAM).toStrictEqual(DISPLAY_PARAMS_STRUCT);
+  });
+
+  it("packs the glow gain into its member of a full parameter block", () => {
+    const packed = packDisplayParams(2.5);
+    expect(packed).toHaveLength(PARAM_FLOATS);
+    expect(packed[DISPLAY_PARAM.glow]).toBe(2.5);
   });
 });
 

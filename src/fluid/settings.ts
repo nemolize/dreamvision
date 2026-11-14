@@ -2,6 +2,7 @@ import {
   DYE_DISSIPATION,
   EARTH_GRAVITY,
   HEAT_COOLING,
+  HEAT_GLOW,
   PRESSURE_ITERATIONS,
   SCENE_WIDTH_METRES,
   SPLAT_FORCE,
@@ -24,6 +25,7 @@ export interface NumericSettings {
   gravity: number;
   sceneWidth: number;
   heatCooling: number;
+  glow: number;
 }
 
 export interface FluidSettings extends NumericSettings {
@@ -41,6 +43,7 @@ const NUMERIC_DEFAULTS: NumericSettings = {
   gravity: EARTH_GRAVITY,
   sceneWidth: SCENE_WIDTH_METRES,
   heatCooling: HEAT_COOLING,
+  glow: HEAT_GLOW,
 };
 
 export const DEFAULT_SETTINGS: FluidSettings = {
@@ -125,6 +128,14 @@ export const SETTING_DESCRIPTORS: readonly SettingDescriptor<
     max: 5,
     step: 0.05,
     precision: 2,
+  },
+  {
+    key: "glow",
+    label: "Glow",
+    min: 0,
+    max: 20,
+    step: 0.1,
+    precision: 1,
   },
 ];
 
