@@ -267,8 +267,27 @@ describe("FluidCanvas teardown", () => {
       "pointerup",
       "touchstart",
     ]);
-    expect(canvasRemove.mock.calls).toEqual(
-      canvasAdd.mock.calls.map(([type, listener]) => [type, listener]),
+    const captureOf = (options: unknown): boolean => {
+      if (typeof options === "boolean") return options;
+      return (
+        typeof options === "object" &&
+        options !== null &&
+        "capture" in options &&
+        options.capture === true
+      );
+    };
+    expect(
+      canvasRemove.mock.calls.map(([type, listener, options]) => [
+        type,
+        listener,
+        captureOf(options),
+      ]),
+    ).toEqual(
+      canvasAdd.mock.calls.map(([type, listener, options]) => [
+        type,
+        listener,
+        captureOf(options),
+      ]),
     );
     expect(documentRemove.mock.calls).toEqual(
       documentAdd.mock.calls.filter(([type]) => type === "visibilitychange"),
@@ -530,7 +549,16 @@ describe("FluidCanvas frame loop", () => {
     const canvas = getCanvas();
 
     expect(fireEvent.touchStart(canvas)).toBe(false);
-    expect(fireEvent.contextMenu(canvas)).toBe(false);
+    const contextMenuFrom = (pointerType: string): boolean =>
+      canvas.dispatchEvent(
+        new PointerEvent("contextmenu", { pointerType, cancelable: true }),
+      );
+    expect(contextMenuFrom("touch")).toBe(false);
+    expect(contextMenuFrom("mouse")).toBe(true);
+    expect(contextMenuFrom("")).toBe(true);
+    expect(
+      canvas.dispatchEvent(new MouseEvent("contextmenu", { cancelable: true })),
+    ).toBe(true);
     fireEvent.pointerDown(canvas, { pointerId: 1, clientX: 10, clientY: 10 });
     fireEvent.pointerMove(canvas, { pointerId: 1, clientX: 30, clientY: 20 });
     runFrame();
