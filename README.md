@@ -101,7 +101,8 @@ surroundings as a fraction, `h = (T − T₀) / T₀`. The Boussinesq form divid
 density deficit by the surroundings' density, so an ideal gas rises at
 `a = g · h / (1 + h)`, never above `g`. The `Gravity` setting is `g` in m/s²,
 and a negative value sinks the hot dye. The `Scale` setting is how many metres
-the canvas width stands for; it converts that acceleration into cells per second
+the canvas width stands for, on a logarithmic slider so the small widths are
+within a pointer's reach; it converts that acceleration into cells per second
 squared, so a wider canvas reads as a slower lift. It scales the lift only:
 pointer drags, vorticity and decay do not follow it. `buoyancy.test.ts` checks
 the lift on the CPU, and a gravity of 0 skips the pass.

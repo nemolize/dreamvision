@@ -2,6 +2,7 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { LOG_TRACK_STEPS } from "@/fluid/descriptor";
 import type { ResolutionSettings } from "@/fluid/resolution";
 import { DEFAULT_RESOLUTION } from "@/fluid/resolution";
 import type { FluidSettings } from "@/fluid/settings";
@@ -110,6 +111,25 @@ describe("SettingsPanel", () => {
     // The descriptor's range, not the input's: a stale max in the DOM must not
     // widen what reaches the solver.
     expect(lastReported(onChange).splatForce).toBe(100);
+  });
+
+  it("counts the Scale track in positions, and reports metres", async () => {
+    const onChange = changeSpy();
+    renderPanel({ onChange });
+    await open();
+
+    const scale = screen.getByRole("slider", { name: "Scale (m)" });
+    expect(scale.getAttribute("max")).toBe(String(LOG_TRACK_STEPS));
+    expect(scale.getAttribute("aria-valuetext")).toBe("3.00");
+
+    fireEvent.change(scale, { target: { value: "0" } });
+    expect(lastReported(onChange).sceneWidth).toBe(0.01);
+
+    fireEvent.change(scale, { target: { value: String(LOG_TRACK_STEPS) } });
+    expect(lastReported(onChange).sceneWidth).toBe(100);
+
+    fireEvent.change(scale, { target: { value: String(LOG_TRACK_STEPS / 2) } });
+    expect(lastReported(onChange).sceneWidth).toBeCloseTo(1, 6);
   });
 
   it("reports the wrap toggle as a whole settings object", async () => {
