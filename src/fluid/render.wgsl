@@ -3,7 +3,7 @@
 @group(0) @binding(0) var dye: texture_2d<f32>;
 
 struct DisplayParams {
-  glow: f32,   // brightness gained per unit of heat
+  glow: f32,
 }
 
 @group(0) @binding(1) var<uniform> displayParams: DisplayParams;

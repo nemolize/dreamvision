@@ -42,6 +42,7 @@ export const ADVECT_PARAM = {
   heatDissipation: 3,
 } as const;
 
+/** Float index of each `DisplayParams` member in `render.wgsl`. */
 export const DISPLAY_PARAM = {
   glow: 0,
 } as const;

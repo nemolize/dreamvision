@@ -21,12 +21,13 @@ import {
 
 /**
  * The host's float offsets, checked against the struct layouts read out of
- * `simulation.wgsl` itself. Inserting a member shifts every later offset and
- * the fluid still renders — just with a wrong metric, radius or dissipation —
- * so nothing in the picture names the member that moved.
+ * `simulation.wgsl` and `render.wgsl` themselves. Inserting a member shifts
+ * every later offset and the fluid still renders — just with a wrong metric,
+ * radius or dissipation — so nothing in the picture names the member that
+ * moved.
  *
- * The shader is the oracle rather than a copy of it, so editing a struct fails
- * these tests without anyone having to remember a twin lives here.
+ * The shaders are the oracle rather than a copy of them, so editing a struct
+ * fails these tests without anyone having to remember a twin lives here.
  */
 
 /** Float width of each type, which is also its alignment: a `vec2f` aligns to 8

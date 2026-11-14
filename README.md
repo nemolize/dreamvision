@@ -111,7 +111,7 @@ the lift on the CPU, and a gravity of 0 skips the pass.
 
 The display pass brightens each cell's colour by `1 + glow · heat` before the
 tone-mapping curve. The `Glow` setting is that `glow` gain: 0 draws the dye with
-no heat glow, and the default of 4 is the look before the setting existed.
+no heat glow.
 
 One deviation from a textbook solver remains: `divergence` and
 `gradientSubtract` use central differences while the Jacobi sweep solves a
