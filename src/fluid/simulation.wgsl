@@ -25,7 +25,7 @@ struct Uniforms {
   vorticity: f32,      // confinement strength; 0 leaves the velocity untouched
   gravityCells: f32,   // gravity in cells per second squared; 0 adds no lift
   _pad2: f32,
-  up: vec2f,           // unit screen-space direction heat rises, y down
+  up: vec2f,           // screen-space direction heat rises, y down; length = share of gravity in the screen plane
   _pad3: vec2f,
 }
 
