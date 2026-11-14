@@ -7,7 +7,7 @@ describe("gravityInCells", () => {
     expect(gravityInCells(9.8, 3, 320)).toBeCloseTo(9.8 / (3 / 320), 10);
   });
 
-  it("halves when the canvas is twice as wide, which is slower motion", () => {
+  it("halves when the canvas is twice as long, which is slower motion", () => {
     expect(gravityInCells(9.8, 6, 320)).toBeCloseTo(
       gravityInCells(9.8, 3, 320) / 2,
       10,

@@ -118,7 +118,7 @@ describe("SettingsPanel", () => {
     renderPanel({ onChange });
     await open();
 
-    const scale = screen.getByRole("slider", { name: "Scale (m)" });
+    const scale = screen.getByRole("slider", { name: "Scale (m, long side)" });
     expect(scale.getAttribute("max")).toBe(String(LOG_TRACK_STEPS));
     expect(scale.getAttribute("aria-valuetext")).toBe("3.00");
 
@@ -145,7 +145,7 @@ describe("SettingsPanel", () => {
     });
     await open();
 
-    const scale = screen.getByRole("slider", { name: "Scale (m)" });
+    const scale = screen.getByRole("slider", { name: "Scale (m, long side)" });
     expect(scale.getAttribute("aria-valuetext")).toBe("0.0101");
     expect(screen.getByText("0.0101")).toBeTruthy();
   });

@@ -144,6 +144,27 @@ describe("packUniforms", () => {
     expect(pack(false, 0, 0, 4)[UNIFORM.gravityCells]).toBe(0);
   });
 
+  it("counts the gravity on the grid's long side, so turning the screen keeps the lift", () => {
+    const packOn = (width: number, height: number): number => {
+      const target = new Float32Array(UNIFORM_FLOATS);
+      packUniforms(
+        target,
+        { width, height },
+        { width: 200, height: 100 },
+        projectionScale(width, height),
+        1 / 60,
+        false,
+        0,
+        9.8,
+        4,
+        [0, -1],
+      );
+      return target[UNIFORM.gravityCells] ?? Number.NaN;
+    };
+    expect(packOn(144, 320)).toBeCloseTo(packOn(320, 144), 4);
+    expect(packOn(144, 320)).toBeCloseTo((9.8 * 320) / 4, 4);
+  });
+
   it("writes the up direction as an x, y pair", () => {
     const packed = pack(false, 0, 0, 1, [0.6, -0.8]);
     expect(packed[UNIFORM.up]).toBeCloseTo(0.6, 6);
