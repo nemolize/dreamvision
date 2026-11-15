@@ -13,6 +13,7 @@ import {
   packSplatUniforms,
   packUniforms,
   PARAM_FLOATS,
+  shakeIsPacked,
   SPLAT_UNIFORM,
   SPLAT_UNIFORM_FLOATS,
   UNIFORM,
@@ -193,6 +194,17 @@ describe("packUniforms", () => {
     const packed = pack(false, 0, 9.8, 4, [0, -1], [30, -20], 0);
     expect(Math.abs(packed[UNIFORM.shake] ?? Number.NaN)).toBe(0);
     expect(Math.abs(packed[UNIFORM.shake + 1] ?? Number.NaN)).toBe(0);
+  });
+
+  it("reports a push only from the shake slots, not from the lift's direction", () => {
+    expect(shakeIsPacked(pack(false, 0, 9.8, 4, [0, -1], [0, 0], 1))).toBe(
+      false,
+    );
+    expect(shakeIsPacked(pack(false, 0, 0, 4, [0, -1], [3, 0], 1))).toBe(true);
+    expect(shakeIsPacked(pack(false, 0, 0, 4, [0, -1], [0, -2], 1))).toBe(true);
+    expect(shakeIsPacked(pack(false, 0, 0, 4, [0, -1], [3, -2], 0))).toBe(
+      false,
+    );
   });
 
   it("writes the simulation grid, not the dye grid, into simSize", () => {

@@ -106,9 +106,10 @@ and a negative value sinks the hot dye. The `Scale` setting is how many metres
 the canvas' long side stands for, on a logarithmic slider so the small sizes are
 within a pointer's reach; it converts that acceleration into cells per second
 squared, so a longer canvas reads as a slower lift, and turning the screen
-leaves the lift unchanged. It scales the lift only:
+leaves the lift unchanged. It scales the lift and the shake push only:
 pointer drags, vorticity and decay do not follow it. `buoyancy.test.ts` checks
-the lift on the CPU, and a gravity of 0 skips the pass.
+the lift on the CPU, and a gravity of 0 skips the pass unless a shake push is
+non-zero.
 
 The display pass brightens each cell's colour by `1 + glow · heat` before the
 tone-mapping curve. The `Glow` setting is that `glow` gain: 0 draws the dye with

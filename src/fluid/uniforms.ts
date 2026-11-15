@@ -20,6 +20,9 @@ export const UNIFORM = {
 } as const;
 
 export const UNIFORM_FLOATS = 16;
+
+export const shakeIsPacked = (target: Float32Array): boolean =>
+  target[UNIFORM.shake] !== 0 || target[UNIFORM.shake + 1] !== 0;
 export const UNIFORM_BYTES = UNIFORM_FLOATS * 4;
 
 /** Float index of each `SplatUniforms` member in `simulation.wgsl` — WGSL

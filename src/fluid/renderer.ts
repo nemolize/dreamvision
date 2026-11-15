@@ -20,9 +20,9 @@ import {
   packDisplayParams,
   packSplatUniforms,
   packUniforms,
+  shakeIsPacked,
   SPLAT_UNIFORM_BYTES,
   SPLAT_UNIFORM_FLOATS,
-  UNIFORM,
   UNIFORM_BYTES,
   UNIFORM_FLOATS,
 } from "./uniforms";
@@ -225,9 +225,7 @@ export const createFluidRenderer = (
       pressureIterations: settings.pressureIterations,
       vorticityConfinement: settings.vorticityConfinement,
       gravity: settings.gravity,
-      shaking:
-        uniformData[UNIFORM.shake] !== 0 ||
-        uniformData[UNIFORM.shake + 1] !== 0,
+      shaking: shakeIsPacked(uniformData),
       timing,
     });
 
