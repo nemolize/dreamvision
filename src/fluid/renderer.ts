@@ -22,6 +22,7 @@ import {
   packUniforms,
   SPLAT_UNIFORM_BYTES,
   SPLAT_UNIFORM_FLOATS,
+  UNIFORM,
   UNIFORM_BYTES,
   UNIFORM_FLOATS,
 } from "./uniforms";
@@ -173,7 +174,12 @@ export const createFluidRenderer = (
 
   resize(width, height);
 
-  const frame = (splats: readonly Splat[], dt: number, up: Direction): void => {
+  const frame = (
+    splats: readonly Splat[],
+    dt: number,
+    up: Direction,
+    shake: Direction,
+  ): void => {
     const current = resources;
     if (current === null) return;
 
@@ -188,6 +194,8 @@ export const createFluidRenderer = (
       settings.gravity,
       settings.sceneWidth,
       up,
+      shake,
+      settings.shake,
     );
     device.queue.writeBuffer(uniformBuffer, 0, uniformData);
 
@@ -217,6 +225,9 @@ export const createFluidRenderer = (
       pressureIterations: settings.pressureIterations,
       vorticityConfinement: settings.vorticityConfinement,
       gravity: settings.gravity,
+      shaking:
+        uniformData[UNIFORM.shake] !== 0 ||
+        uniformData[UNIFORM.shake + 1] !== 0,
       timing,
     });
 

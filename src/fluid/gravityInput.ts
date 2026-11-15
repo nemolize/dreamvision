@@ -33,7 +33,9 @@ export const watchGravity = (
   tracker: GravityTracker,
 ): GravityWatch => {
   const onMotion = (event: DeviceMotionEvent): void => {
-    tracker.update(event.accelerationIncludingGravity, screenAngle(win));
+    const angle = screenAngle(win);
+    tracker.update(event.accelerationIncludingGravity, angle);
+    tracker.updateShake(event.acceleration, angle);
   };
   win.addEventListener("devicemotion", onMotion);
 

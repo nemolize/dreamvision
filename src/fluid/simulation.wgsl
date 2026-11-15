@@ -26,7 +26,7 @@ struct Uniforms {
   gravityCells: f32,   // gravity in cells per second squared; 0 adds no lift
   _pad2: f32,
   up: vec2f,           // screen-space direction heat rises, y down; length = share of gravity in the screen plane
-  _pad3: vec2f,
+  shake: vec2f,        // screen-space inertial force of a shaken device, cells per second squared, y down; 0 adds none
 }
 
 @group(0) @binding(0) var<uniform> u: Uniforms;
@@ -180,7 +180,7 @@ fn buoyancy(@builtin(global_invocation_id) gid: vec3u) {
   let heat = max(sampleAt(buoyancyDye, dyeSize, dyeCell).a, 0.0);
 
   // Boussinesq: density deficit over the surroundings' density, heat / (1 + heat).
-  let force = u.gravityCells * heat / (1.0 + heat) * u.up;
+  let force = u.gravityCells * heat / (1.0 + heat) * u.up + u.shake;
   let velocity = sampleAt(buoyancyVelocity, u.simSize, cell).xy;
   let lifted = velocity + u.toStored * force * u.dt;
   textureStore(buoyancyOutput, gid.xy, vec4f(lifted, 0.0, 1.0));

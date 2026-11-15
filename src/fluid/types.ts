@@ -16,7 +16,12 @@ export interface Splat {
 export interface FluidRenderer {
   /** Advance by `dt` seconds and draw one frame, injecting each splat before
    * the projection. */
-  frame: (splats: readonly Splat[], dt: number, up: Direction) => void;
+  frame: (
+    splats: readonly Splat[],
+    dt: number,
+    up: Direction,
+    shake: Direction,
+  ) => void;
   applySettings: (settings: FluidSettings) => void;
   setResolution: (resolution: ResolutionSettings) => void;
   resize: (width: number, height: number) => void;

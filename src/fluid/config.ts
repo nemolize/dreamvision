@@ -29,6 +29,10 @@ export const EARTH_GRAVITY = 9.8;
 
 export const SCENE_WIDTH_METRES = 3;
 
+/** 1 matches a physical container shaken at that acceleration. Default and
+ * range chosen empirically, no fixed source. */
+export const SHAKE_STRENGTH = 1;
+
 export const HEAT_COOLING = 1;
 
 /** Brightness gained per unit of heat. Chosen empirically, no fixed source. */
