@@ -50,7 +50,7 @@ describe("SettingsPanel", () => {
 
     await open();
 
-    expect(screen.getAllByRole("slider")).toHaveLength(13);
+    expect(screen.getAllByRole("slider")).toHaveLength(14);
     expect(screen.getByRole("heading", { name: "Settings" })).toBeTruthy();
   });
 
@@ -76,7 +76,7 @@ describe("SettingsPanel", () => {
     expect(screen.getByText("0.0005")).toBeTruthy();
     expect(screen.getAllByText("10")).toHaveLength(1);
     expect(screen.getByText("5")).toBeTruthy();
-    expect(screen.getByText("0.20")).toBeTruthy();
+    expect(screen.getAllByText("0.20")).toHaveLength(2);
   });
 
   it("reports a moved slider as a whole settings object", async () => {

@@ -201,7 +201,12 @@ export const createFluidRenderer = (
 
     const applied = splats.slice(0, MAX_SPLATS_PER_FRAME);
     applied.forEach((splat, index) => {
-      packSplatUniforms(splatData, splat, settings.splatRadius);
+      packSplatUniforms(
+        splatData,
+        splat,
+        settings.splatRadius,
+        settings.heatPerDye,
+      );
       device.queue.writeBuffer(
         splatBuffer,
         index * splatSlotBytes,

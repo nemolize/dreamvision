@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 
-import { HEAT_PER_DYE } from "./config";
 import { projectionScale } from "./projection";
 import renderShaderSource from "./render.wgsl?raw";
 import simulationShaderSource from "./simulation.wgsl?raw";
@@ -296,7 +295,7 @@ describe("packSplatUniforms", () => {
 
   const pack = (): Float32Array => {
     const target = new Float32Array(SPLAT_UNIFORM_FLOATS);
-    packSplatUniforms(target, splat, 0.0035);
+    packSplatUniforms(target, splat, 0.0035, 0.3);
     return target;
   };
 
@@ -325,13 +324,13 @@ describe("packSplatUniforms", () => {
   /** The renderer reuses one array across a frame's splats, so a member the
    * packer skipped would carry the previous splat's value into this one. */
   it("adds heat in proportion to the brightest colour channel", () => {
-    expect(pack()[SPLAT_UNIFORM.heat]).toBeCloseTo(HEAT_PER_DYE * 0.5, 6);
+    expect(pack()[SPLAT_UNIFORM.heat]).toBeCloseTo(0.3 * 0.5, 6);
   });
 
   it("overwrites every member rather than leaving a stale one", () => {
     const stale = 9;
     const target = new Float32Array(SPLAT_UNIFORM_FLOATS).fill(stale);
-    packSplatUniforms(target, splat, 0.0035);
+    packSplatUniforms(target, splat, 0.0035, 0.3);
     for (const offset of Object.values(SPLAT_UNIFORM)) {
       expect(target[offset]).not.toBe(stale);
     }
