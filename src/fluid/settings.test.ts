@@ -199,3 +199,16 @@ describe("shake", () => {
     expect(clampSetting("shake", 1e6)).toBe(10);
   });
 });
+
+describe("heatPerDye", () => {
+  it("defaults to 0.2, also for a blob that predates it", () => {
+    expect(DEFAULT_SETTINGS.heatPerDye).toBe(0.2);
+    expect(normaliseSettings({}).heatPerDye).toBe(0.2);
+    expect(normaliseSettings({ heatPerDye: 0.5 }).heatPerDye).toBe(0.5);
+  });
+
+  it("clamps into the slider's range, down to no heat at all", () => {
+    expect(clampSetting("heatPerDye", -1)).toBe(0);
+    expect(clampSetting("heatPerDye", 1e6)).toBe(2);
+  });
+});

@@ -3,6 +3,7 @@ import {
   EARTH_GRAVITY,
   HEAT_COOLING,
   HEAT_GLOW,
+  HEAT_PER_DYE,
   PRESSURE_ITERATIONS,
   SCENE_WIDTH_METRES,
   SHAKE_STRENGTH,
@@ -27,6 +28,7 @@ export interface NumericSettings {
   sceneWidth: number;
   shake: number;
   heatCooling: number;
+  heatPerDye: number;
   glow: number;
 }
 
@@ -46,6 +48,7 @@ const NUMERIC_DEFAULTS: NumericSettings = {
   sceneWidth: SCENE_WIDTH_METRES,
   shake: SHAKE_STRENGTH,
   heatCooling: HEAT_COOLING,
+  heatPerDye: HEAT_PER_DYE,
   glow: HEAT_GLOW,
 };
 
@@ -137,6 +140,14 @@ export const SETTING_DESCRIPTORS: readonly SettingDescriptor<
     label: "Heat cooling",
     min: 0.05,
     max: 5,
+    step: 0.05,
+    precision: 2,
+  },
+  {
+    key: "heatPerDye",
+    label: "Heat per dye",
+    min: 0,
+    max: 2,
     step: 0.05,
     precision: 2,
   },

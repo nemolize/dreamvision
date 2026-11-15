@@ -1,4 +1,3 @@
-import { HEAT_PER_DYE } from "./config";
 import type { Grid } from "./grid";
 import { gravityInCells, shakeInCells } from "./lift";
 import type { ProjectionScale } from "./projection";
@@ -100,12 +99,13 @@ export const packSplatUniforms = (
   target: Float32Array,
   splat: Splat,
   radius: number,
+  heatPerDye: number,
 ): void => {
   target.set([splat.x, splat.y], SPLAT_UNIFORM.point);
   target.set([splat.dx, splat.dy], SPLAT_UNIFORM.delta);
   target.set(splat.color, SPLAT_UNIFORM.color);
   target[SPLAT_UNIFORM.radius] = radius;
-  target[SPLAT_UNIFORM.heat] = HEAT_PER_DYE * Math.max(...splat.color);
+  target[SPLAT_UNIFORM.heat] = heatPerDye * Math.max(...splat.color);
 };
 
 export const packDisplayParams = (glow: number): Float32Array => {
