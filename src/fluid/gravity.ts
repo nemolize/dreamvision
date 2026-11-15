@@ -29,6 +29,51 @@ export const upFromReading = (
   return [right / tilt, -above / tilt];
 };
 
+const ZERO_FORCE: Direction = [0, 0];
+
+/** Hot dye is the lighter fluid, so a device's acceleration pushes it the same
+ * way; a missing or non-finite axis is none. */
+export const shakeFromAcceleration = (
+  reading: GravityReading | null,
+  angleDegrees: number,
+): Direction => {
+  const x = reading?.x;
+  const y = reading?.y;
+  if (typeof x !== "number" || typeof y !== "number") return ZERO_FORCE;
+  if (!Number.isFinite(x) || !Number.isFinite(y)) return ZERO_FORCE;
+
+  const angle = (angleDegrees * Math.PI) / 180;
+  const right = x * Math.cos(angle) - y * Math.sin(angle);
+  const above = x * Math.sin(angle) + y * Math.cos(angle);
+  return [right, -above];
+};
+
+/** Keeps a translation out of `up`, which `shakeFromAcceleration` already counts. */
+export const withoutAcceleration = (
+  including: GravityReading | null,
+  acceleration: GravityReading | null,
+): GravityReading | null => {
+  const x = acceleration?.x;
+  const y = acceleration?.y;
+  if (including === null || typeof x !== "number" || typeof y !== "number") {
+    return including;
+  }
+  if (!Number.isFinite(x) || !Number.isFinite(y)) return including;
+  if (typeof including.x !== "number" || typeof including.y !== "number") {
+    return including;
+  }
+  const z = acceleration?.z;
+  const zWithGravity = including.z ?? null;
+  return {
+    x: including.x - x,
+    y: including.y - y,
+    z:
+      zWithGravity !== null && typeof z === "number" && Number.isFinite(z)
+        ? zWithGravity - z
+        : zWithGravity,
+  };
+};
+
 export const inPlaneShare = (reading: GravityReading | null): number | null => {
   const x = reading?.x;
   const y = reading?.y;
@@ -63,17 +108,26 @@ export const easeDirection = (
   return [Math.cos(angle), Math.sin(angle)];
 };
 
-/** Steps to the lift's direction scaled by `inPlaneShare`, so its length is
- * the share of `Gravity` that acts in the screen plane. */
+/** Steps the lift's direction, scaled by `inPlaneShare`; also holds the latest
+ * shake force, which is not eased. */
 export class GravityTracker {
   private target: Direction = DEFAULT_UP;
   private current: Direction = DEFAULT_UP;
   private targetShare = 1;
   private currentShare = 1;
+  private shaking: Direction = ZERO_FORCE;
 
   update(reading: GravityReading | null, angleDegrees: number): void {
     this.target = upFromReading(reading, angleDegrees) ?? this.target;
     this.targetShare = inPlaneShare(reading) ?? this.targetShare;
+  }
+
+  updateShake(reading: GravityReading | null, angleDegrees: number): void {
+    this.shaking = shakeFromAcceleration(reading, angleDegrees);
+  }
+
+  shake(): Direction {
+    return this.shaking;
   }
 
   step(dt: number): Direction {

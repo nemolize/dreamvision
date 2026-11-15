@@ -37,6 +37,7 @@ const encode = (
   gravity = 0,
   timing: FrameTiming | null = null,
   trace: Trace = { computeDescriptors: [], renderDescriptors: [], order: [] },
+  shaking = false,
 ): Call[] => {
   const calls: Call[] = [];
   let group = "";
@@ -129,6 +130,7 @@ const encode = (
     pressureIterations: 1,
     vorticityConfinement,
     gravity,
+    shaking,
     timing,
   };
   if (!isFrameEncode(frame)) throw new Error("unreachable");
@@ -198,6 +200,12 @@ describe("encodeFrame's buoyancy pass", () => {
     expect(encode(0, 0).map(([pipeline]) => pipeline)).not.toContain(
       "buoyancy",
     );
+  });
+
+  it("runs the pass for a shake at gravity 0", () => {
+    expect(
+      encode(0, 0, null, undefined, true).map(([pipeline]) => pipeline),
+    ).toContain("buoyancy");
   });
 
   it("runs the pass at a negative gravity, which sinks hot dye", () => {

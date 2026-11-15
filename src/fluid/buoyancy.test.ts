@@ -23,6 +23,7 @@ const buoyancy = (
   up: Direction,
   dt: number,
   wrap: boolean,
+  shake: Direction = [0, 0],
 ): Velocity => {
   const { width, height } = u.x;
   const scale = projectionScale(width, height);
@@ -37,8 +38,8 @@ const buoyancy = (
     const h = Math.max(heatAt(x, y), 0);
     return (
       (axis === 0 ? scale.toStoredX : scale.toStoredY) *
-      ((gravity * h) / (1 + h)) *
-      up[axis] *
+      (h / (1 + h)) *
+      (gravity * up[axis] + shake[axis]) *
       dt
     );
   };
@@ -284,6 +285,92 @@ describe("the lift through the projection", () => {
   }
 });
 
+describe("a shaken device's push", () => {
+  const n = 16;
+  const cold = fieldFrom(n, n, () => 0);
+  const hot = blob(n, n);
+  const push: Direction = [3, -2];
+  const scale = projectionScale(n, n);
+
+  it("pushes no cell that has no heat", () => {
+    const pushed = buoyancy(rest(n, n), cold, 0, UP, DT, false, push);
+    expect(Math.max(...pushed.x.data.map(Math.abs))).toBe(0);
+    expect(Math.max(...pushed.y.data.map(Math.abs))).toBe(0);
+  });
+
+  it("pushes a hot cell along the push, by the share of heat it carries", () => {
+    const pushed = buoyancy(rest(n, n), hot, 0, UP, DT, false, push);
+    const h = at(hot, 8, 8, false);
+    expect(at(pushed.x, 8, 8, false)).toBeCloseTo(
+      scale.toStoredX * push[0] * (h / (1 + h)) * DT,
+      12,
+    );
+    expect(at(pushed.y, 8, 8, false)).toBeCloseTo(
+      scale.toStoredY * push[1] * (h / (1 + h)) * DT,
+      12,
+    );
+  });
+
+  it("acts at a gravity of 0", () => {
+    const pushed = buoyancy(rest(n, n), hot, 0, UP, DT, false, push);
+    expect(at(pushed.x, 8, 8, false)).toBeGreaterThan(0);
+  });
+
+  it("adds nothing for a zero push, leaving the lift as it was", () => {
+    expect(buoyancy(rest(n, n), hot, 10, UP, DT, false, [0, 0])).toStrictEqual(
+      buoyancy(rest(n, n), hot, 10, UP, DT, false),
+    );
+  });
+
+  it("stacks on the lift rather than replacing it", () => {
+    const lift = buoyancy(rest(n, n), hot, 10, UP, DT, false);
+    const both = buoyancy(rest(n, n), hot, 10, UP, DT, false, push);
+    const alone = buoyancy(rest(n, n), hot, 0, UP, DT, false, push);
+    expect(at(both.x, 8, 8, false) - at(lift.x, 8, 8, false)).toBeCloseTo(
+      at(alone.x, 8, 8, false),
+      12,
+    );
+  });
+
+  describe("through the projection", () => {
+    const grids: readonly (readonly [number, number])[] = [
+      [16, 16],
+      [32, 16],
+      [16, 32],
+    ];
+    for (const wrap of [false, true]) {
+      for (const sweeps of [32, 600]) {
+        for (const [width, height] of grids) {
+          it(`keeps a local heat blob moving with the push, with ${
+            wrap ? "joined edges" : "walls"
+          }, ${String(sweeps)} sweeps, ${String(width)}x${String(height)}`, () => {
+            const side: Direction = [1, 0];
+            const pushed = buoyancy(
+              rest(width, height),
+              blob(width, height),
+              0,
+              UP,
+              DT,
+              wrap,
+              [3, 0],
+            );
+            const projected = project(pushed, wrap, sweeps);
+            expect(
+              along(projected, side, width / 2, height / 2),
+            ).toBeGreaterThan(0);
+          });
+        }
+      }
+    }
+
+    it("leaves a push on dye with no heat at rest", () => {
+      const pushed = buoyancy(rest(n, n), cold, 0, UP, DT, false, push);
+      const projected = project(pushed, false, 600);
+      expect(Math.max(...projected.x.data.map(Math.abs))).toBe(0);
+    });
+  });
+});
+
 describe("the heat's decay", () => {
   const cool = (heat: number, rate: number, dt: number): number =>
     heat / (1 + rate * dt);
@@ -305,7 +392,7 @@ describe("the shader's side of it", () => {
       /let heat = max\(sampleAt\(buoyancyDye, dyeSize, dyeCell\)\.a, 0\.0\);/,
     );
     expect(simulationShaderSource).toMatch(
-      /let force = u\.gravityCells \* heat \/ \(1\.0 \+ heat\) \* u\.up;/,
+      /let contrast = heat \/ \(1\.0 \+ heat\);\s+let force = contrast \* \(u\.gravityCells \* u\.up \+ u\.shake\);/,
     );
     expect(simulationShaderSource).toMatch(
       /let lifted = velocity \+ u\.toStored \* force \* u\.dt;/,

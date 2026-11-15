@@ -11,8 +11,12 @@ const motion = (
     y: number | null;
     z?: number | null;
   } | null,
+  acceleration: { x: number | null; y: number | null } | null = null,
 ): Event =>
-  Object.assign(new Event("devicemotion"), { accelerationIncludingGravity });
+  Object.assign(new Event("devicemotion"), {
+    accelerationIncludingGravity,
+    acceleration,
+  });
 
 const defineOnce = (target: object, key: string, value: unknown): void => {
   Object.defineProperty(target, key, { value, configurable: true });
@@ -90,6 +94,53 @@ describe("the devicemotion listener", () => {
     window.dispatchEvent(motion({ x: null, y: null }));
     window.dispatchEvent(motion(null));
     expect(tracker.step(100)).toStrictEqual([0, -1]);
+    watch.dispose();
+  });
+
+  it("feeds the acceleration, gravity excluded, to the tracker as a push the same way", () => {
+    const { tracker, watch } = watched();
+    window.dispatchEvent(motion({ x: 0, y: G }, { x: 3, y: 0 }));
+    const [x, y] = tracker.shake();
+    expect(x).toBeCloseTo(3, 6);
+    expect(y).toBeCloseTo(0, 6);
+    watch.dispose();
+  });
+
+  it("turns the push by the screen's angle", () => {
+    stub(window.screen, "orientation", { angle: 90 });
+    const { tracker, watch } = watched();
+    window.dispatchEvent(motion({ x: 0, y: G }, { x: 3, y: 0 }));
+    const [x, y] = tracker.shake();
+    expect(x).toBeCloseTo(0, 6);
+    expect(y).toBeCloseTo(-3, 6);
+    watch.dispose();
+  });
+
+  it("keeps the lift upright while a shake adds to the reading, counting it once", () => {
+    const { tracker, watch } = watched();
+    window.dispatchEvent(motion({ x: 3, y: G }, { x: 3, y: 0 }));
+    const [x, y] = tracker.step(100);
+    expect(x).toBeCloseTo(0, 6);
+    expect(y).toBeCloseTo(-1, 6);
+    watch.dispose();
+  });
+
+  it("falls back to the raw reading for the lift where no acceleration is reported", () => {
+    const { tracker, watch } = watched();
+    window.dispatchEvent(motion({ x: G, y: 0 }, null));
+    const [x, y] = tracker.step(100);
+    expect(x).toBeCloseTo(1, 6);
+    expect(y).toBeCloseTo(0, 6);
+    watch.dispose();
+  });
+
+  it("pushes with nothing where the device reports no acceleration", () => {
+    const { tracker, watch } = watched();
+    window.dispatchEvent(motion({ x: 0, y: G }, { x: 3, y: 0 }));
+    window.dispatchEvent(motion({ x: 0, y: G }, null));
+    expect(tracker.shake()).toStrictEqual([0, 0]);
+    window.dispatchEvent(motion({ x: 0, y: G }, { x: null, y: null }));
+    expect(tracker.shake()).toStrictEqual([0, 0]);
     watch.dispose();
   });
 

@@ -54,7 +54,7 @@ test.describe("fluid canvas", () => {
     await page.getByRole("button", { name: "Open settings" }).click();
 
     await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
-    await expect(page.getByRole("slider")).toHaveCount(12);
+    await expect(page.getByRole("slider")).toHaveCount(13);
   });
 
   test("restores a changed setting after a reload, and drops it on reset", async ({

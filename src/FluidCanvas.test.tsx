@@ -591,6 +591,27 @@ describe("FluidCanvas frame loop", () => {
     expect(Math.abs(y)).toBeLessThan(0.1);
   });
 
+  it("hands the renderer a push along the device's acceleration, and none before one arrives", async () => {
+    await mount();
+
+    runFrame();
+    expect(vi.mocked(onlyRenderer().frame).mock.calls[0]?.[3]).toEqual([0, 0]);
+
+    window.dispatchEvent(
+      Object.assign(new Event("devicemotion"), {
+        accelerationIncludingGravity: { x: 0, y: 9.8, z: 0 },
+        acceleration: { x: 3, y: 0, z: 0 },
+      }),
+    );
+    runFrame();
+
+    const [x, y] = vi.mocked(onlyRenderer().frame).mock.calls.at(-1)?.[3] ?? [
+      0, 0,
+    ];
+    expect(x).toBeCloseTo(3, 6);
+    expect(y).toBeCloseTo(0, 6);
+  });
+
   it("asks for motion access on the first release only, never on a press or a cancel", async () => {
     const requestPermission = vi.fn().mockResolvedValue("granted");
     vi.stubGlobal(

@@ -212,7 +212,8 @@ export const FluidCanvas = () => {
 
         const advanced = schedule.advance(elapsed, {
           consume: () => pointer.consume(),
-          frame: (splats, dt) => renderer?.frame(splats, dt, gravity.step(dt)),
+          frame: (splats, dt) =>
+            renderer?.frame(splats, dt, gravity.step(dt), gravity.shake()),
         });
         frameMeter.update(now, showStats, advanced > 0);
 

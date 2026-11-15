@@ -106,13 +106,33 @@ and a negative value sinks the hot dye. The `Scale` setting is how many metres
 the canvas' long side stands for, on a logarithmic slider so the small sizes are
 within a pointer's reach; it converts that acceleration into cells per second
 squared, so a longer canvas reads as a slower lift, and turning the screen
-leaves the lift unchanged. It scales the lift only:
+leaves the lift unchanged. It scales the lift and the shake push only:
 pointer drags, vorticity and decay do not follow it. `buoyancy.test.ts` checks
-the lift on the CPU, and a gravity of 0 skips the pass.
+the lift on the CPU, and a gravity of 0 skips the pass unless a shake push is
+non-zero.
 
 The display pass brightens each cell's colour by `1 + glow · heat` before the
 tone-mapping curve. The `Glow` setting is that `glow` gain: 0 draws the dye with
 no heat glow.
+
+Shaking the device acts through the same density contrast as the lift. The
+`buoyancy` pass treats the device's acceleration `a` (the `devicemotion`
+`acceleration` reading, gravity excluded, rotated by the screen's orientation) as
+a change of the effective gravity, `g - Shake · a`, so a cell's force is
+`heat / (1 + heat) · (Gravity · up + Shake · a)`. Hot dye, the lighter fluid,
+moves the same way as the device; dye with no heat gets no force. A missing or
+non-finite reading is no push. The reading is used as it arrives, and `up` comes
+from the gravity reading with that acceleration taken out, so a translation is
+counted once. `Shake` scales `a`, in cells per second squared through `Scale`
+like the lift: 1 changes the effective gravity by exactly the device's
+acceleration, and 0 adds no force. The pass also runs at a `Gravity` of 0 while a
+push is non-zero.
+
+A force that is the same in every cell would be a pure pressure gradient in a
+closed container, which the projection removes; weighting it by heat leaves a
+rotational part the projection keeps, so a local blob of hot dye still moves at
+the default `Pressure sweeps`, with walls or `Wrap edges` alike. A heat layout
+whose weighted force is a pure gradient is still cancelled.
 
 One deviation from a textbook solver remains: `divergence` and
 `gradientSubtract` use central differences while the Jacobi sweep solves a
@@ -129,9 +149,9 @@ the options are in
 
 ### The settings panel
 
-The gear opens twelve sliders over the running canvas. The ten solver settings
+The gear opens thirteen sliders over the running canvas. The eleven solver settings
 reach the running frame as the slider moves; the two grid resolutions wait for
-the drag to end, for the reason the next section gives. All twelve are stored, so
+the drag to end, for the reason the next section gives. All thirteen are stored, so
 the next load opens where you left it.
 
 The `Frame stats` checkbox, off by default, shows the frame rate and the GPU time

@@ -184,3 +184,18 @@ describe("glow", () => {
     expect(clampSetting("glow", 1e6)).toBe(20);
   });
 });
+
+describe("shake", () => {
+  it("defaults the Shake strength to 1, also for a blob that predates it", () => {
+    expect(DEFAULT_SETTINGS.shake).toBe(1);
+    expect(normaliseSettings({}).shake).toBe(1);
+    expect(normaliseSettings({ shake: "x" }).shake).toBe(1);
+    expect(normaliseSettings({ shake: 2 }).shake).toBe(2);
+  });
+
+  it("clamps Shake into the slider's range, down to no shaking at all", () => {
+    expect(clampSetting("shake", -1)).toBe(0);
+    expect(clampSetting("shake", 0)).toBe(0);
+    expect(clampSetting("shake", 1e6)).toBe(10);
+  });
+});
