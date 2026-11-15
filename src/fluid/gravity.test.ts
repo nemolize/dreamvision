@@ -6,6 +6,7 @@ import {
   easeDirection,
   GravityTracker,
   inPlaneShare,
+  shakeFromAcceleration,
   upFromReading,
 } from "./gravity";
 
@@ -48,6 +49,36 @@ describe("upFromReading", () => {
     expect(upFromReading({ x: 5, y: null }, 0)).toBeNull();
     expect(upFromReading({ x: Number.NaN, y: 5 }, 0)).toBeNull();
     expect(upFromReading({ x: 5, y: Infinity }, 0)).toBeNull();
+  });
+});
+
+describe("shakeFromAcceleration", () => {
+  it("pushes opposite to the device's acceleration", () => {
+    expect(shakeFromAcceleration({ x: 3, y: 0 }, 0)).toEqual(close(-3, 0));
+    expect(shakeFromAcceleration({ x: -3, y: 0 }, 0)).toEqual(close(3, 0));
+  });
+
+  it("reads a device pushed up the screen as a force toward the bottom", () => {
+    expect(shakeFromAcceleration({ x: 0, y: 2 }, 0)).toEqual(close(0, 2));
+  });
+
+  it("follows the screen rotation as the gravity reading does", () => {
+    expect(upFromReading({ x: G, y: 0 }, 90)).toEqual(close(0, -1));
+    expect(shakeFromAcceleration({ x: 3, y: 0 }, 90)).toEqual(close(0, 3));
+    expect(shakeFromAcceleration({ x: 0, y: 3 }, 90)).toEqual(close(3, 0));
+  });
+
+  it("is no force for a null, missing or non-finite reading", () => {
+    for (const reading of [
+      null,
+      { x: null, y: null },
+      { x: 3, y: null },
+      { x: null, y: 3 },
+      { x: Number.NaN, y: 1 },
+      { x: 1, y: Infinity },
+    ]) {
+      expect(shakeFromAcceleration(reading, 0)).toEqual([0, 0]);
+    }
   });
 });
 
@@ -126,6 +157,25 @@ describe("easeDirection", () => {
 });
 
 describe("GravityTracker", () => {
+  it("pushes with nothing before any acceleration arrives", () => {
+    expect(new GravityTracker().shake()).toStrictEqual([0, 0]);
+  });
+
+  it("pushes at once and for as long as the acceleration lasts, then stops", () => {
+    const tracker = new GravityTracker();
+    tracker.updateShake({ x: 3, y: 0 }, 0);
+    expect(tracker.shake()).toEqual(close(-3, 0));
+    tracker.updateShake({ x: 0, y: 0 }, 0);
+    expect(tracker.shake()).toEqual(close(0, 0));
+  });
+
+  it("drops the push when a reading turns unusable, instead of holding the last", () => {
+    const tracker = new GravityTracker();
+    tracker.updateShake({ x: 3, y: 0 }, 0);
+    tracker.updateShake(null, 0);
+    expect(tracker.shake()).toStrictEqual([0, 0]);
+  });
+
   it("rises toward the top of the screen before any reading arrives", () => {
     expect(new GravityTracker().step(1)).toStrictEqual(DEFAULT_UP);
   });

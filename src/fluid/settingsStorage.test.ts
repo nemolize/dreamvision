@@ -57,6 +57,11 @@ describe("loadSettings", () => {
     });
   });
 
+  it("persists the shake strength", () => {
+    saveSettings({ ...DEFAULT_SETTINGS, shake: 2.5 });
+    expect(loadSettings()).toMatchObject({ shake: 2.5 });
+  });
+
   it("persists the glow", () => {
     saveSettings({ ...DEFAULT_SETTINGS, glow: 7.5 });
     expect(loadSettings()).toMatchObject({ glow: 7.5 });

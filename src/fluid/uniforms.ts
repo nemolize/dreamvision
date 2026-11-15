@@ -1,6 +1,6 @@
 import { HEAT_PER_DYE } from "./config";
 import type { Grid } from "./grid";
-import { gravityInCells } from "./lift";
+import { gravityInCells, shakeInCells } from "./lift";
 import type { ProjectionScale } from "./projection";
 import { projectionUniform } from "./projection";
 import type { Splat } from "./types";
@@ -16,6 +16,7 @@ export const UNIFORM = {
   vorticity: 9,
   gravityCells: 10,
   up: 12,
+  shake: 14,
 } as const;
 
 export const UNIFORM_FLOATS = 16;
@@ -64,6 +65,8 @@ export const packUniforms = (
   gravity: number,
   sceneWidth: number,
   up: readonly [number, number],
+  shake: readonly [number, number],
+  shakeStrength: number,
 ): void => {
   target.set([simGrid.width, simGrid.height], UNIFORM.simSize);
   target[UNIFORM.dt] = dt;
@@ -79,6 +82,15 @@ export const packUniforms = (
     Math.max(simGrid.width, simGrid.height),
   );
   target.set(up, UNIFORM.up);
+  target.set(
+    shakeInCells(
+      shake,
+      shakeStrength,
+      sceneWidth,
+      Math.max(simGrid.width, simGrid.height),
+    ),
+    UNIFORM.shake,
+  );
 };
 
 export const packSplatUniforms = (

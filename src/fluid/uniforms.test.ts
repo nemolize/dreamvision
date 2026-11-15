@@ -98,7 +98,7 @@ describe("UNIFORM", () => {
   });
 
   it("is sized to hold the struct", () => {
-    expect(UNIFORM_FLOATS).toBeGreaterThanOrEqual(UNIFORM.up + vec2f);
+    expect(UNIFORM_FLOATS).toBeGreaterThanOrEqual(UNIFORM.shake + vec2f);
     expect(UNIFORM_FLOATS % vec4f).toBe(0);
   });
 });
@@ -110,6 +110,8 @@ describe("packUniforms", () => {
     gravity = 0,
     sceneWidth = 1,
     up: readonly [number, number] = [0, -1],
+    shake: readonly [number, number] = [0, 0],
+    shakeStrength = 1,
   ): Float32Array => {
     const target = new Float32Array(UNIFORM_FLOATS);
     packUniforms(
@@ -123,6 +125,8 @@ describe("packUniforms", () => {
       gravity,
       sceneWidth,
       up,
+      shake,
+      shakeStrength,
     );
     return target;
   };
@@ -158,6 +162,8 @@ describe("packUniforms", () => {
         9.8,
         4,
         [0, -1],
+        [0, 0],
+        1,
       );
       return target[UNIFORM.gravityCells] ?? Number.NaN;
     };
@@ -169,6 +175,24 @@ describe("packUniforms", () => {
     const packed = pack(false, 0, 0, 1, [0.6, -0.8]);
     expect(packed[UNIFORM.up]).toBeCloseTo(0.6, 6);
     expect(packed[UNIFORM.up + 1]).toBeCloseTo(-0.8, 6);
+  });
+
+  it("writes the shake force in cells per second squared, counted on the long side", () => {
+    const packed = pack(false, 0, 0, 4, [0, -1], [3, -2]);
+    expect(packed[UNIFORM.shake]).toBeCloseTo((3 * 64) / 4, 4);
+    expect(packed[UNIFORM.shake + 1]).toBeCloseTo((-2 * 64) / 4, 4);
+  });
+
+  it("scales the shake force by the Shake setting", () => {
+    const full = pack(false, 0, 0, 4, [0, -1], [3, -2], 1);
+    const half = pack(false, 0, 0, 4, [0, -1], [3, -2], 0.5);
+    expect(half[UNIFORM.shake]).toBeCloseTo((full[UNIFORM.shake] ?? 0) / 2, 4);
+  });
+
+  it("adds no shake force at Shake 0, whatever the device reports", () => {
+    const packed = pack(false, 0, 9.8, 4, [0, -1], [30, -20], 0);
+    expect(Math.abs(packed[UNIFORM.shake] ?? Number.NaN)).toBe(0);
+    expect(Math.abs(packed[UNIFORM.shake + 1] ?? Number.NaN)).toBe(0);
   });
 
   it("writes the simulation grid, not the dye grid, into simSize", () => {
@@ -210,6 +234,8 @@ describe("packUniforms", () => {
       1,
       1,
       [0, -1],
+      [0, 0],
+      1,
     );
     for (const offset of Object.values(UNIFORM)) {
       expect(target[offset]).not.toBeNaN();

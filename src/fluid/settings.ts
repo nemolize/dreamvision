@@ -5,6 +5,7 @@ import {
   HEAT_GLOW,
   PRESSURE_ITERATIONS,
   SCENE_WIDTH_METRES,
+  SHAKE_STRENGTH,
   SPLAT_FORCE,
   SPLAT_RADIUS,
   VELOCITY_DISSIPATION,
@@ -24,6 +25,7 @@ export interface NumericSettings {
   vorticityConfinement: number;
   gravity: number;
   sceneWidth: number;
+  shake: number;
   heatCooling: number;
   glow: number;
 }
@@ -42,6 +44,7 @@ const NUMERIC_DEFAULTS: NumericSettings = {
   vorticityConfinement: VORTICITY_CONFINEMENT,
   gravity: EARTH_GRAVITY,
   sceneWidth: SCENE_WIDTH_METRES,
+  shake: SHAKE_STRENGTH,
   heatCooling: HEAT_COOLING,
   glow: HEAT_GLOW,
 };
@@ -119,6 +122,14 @@ export const SETTING_DESCRIPTORS: readonly SettingDescriptor<
     step: 0.01,
     precision: 2,
     track: "log",
+  },
+  {
+    key: "shake",
+    label: "Shake",
+    min: 0,
+    max: 10,
+    step: 0.1,
+    precision: 1,
   },
   // Floor above zero: heat must always decay.
   {

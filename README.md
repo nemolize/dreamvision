@@ -114,6 +114,15 @@ The display pass brightens each cell's colour by `1 + glow · heat` before the
 tone-mapping curve. The `Glow` setting is that `glow` gain: 0 draws the dye with
 no heat glow.
 
+Shaking the device pushes the fluid the way a container's walls would: the
+`buoyancy` pass adds a uniform force opposite to the `devicemotion`
+`acceleration` reading (gravity excluded, rotated by the screen's orientation) to
+every cell, heat or not. The reading is used as it arrives, so the push lasts as
+long as the acceleration does, and a missing or non-finite reading is no push.
+The `Shake` setting scales it, in cells per second squared through `Scale` like
+the lift, where 1 matches a physical container shaken at that acceleration and 0
+adds no force. The pass also runs at a gravity of 0 while a push is non-zero.
+
 One deviation from a textbook solver remains: `divergence` and
 `gradientSubtract` use central differences while the Jacobi sweep solves a
 1-cell Laplacian, so the sweep does not invert the operator whose divergence it
