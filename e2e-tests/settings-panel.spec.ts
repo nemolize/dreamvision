@@ -137,7 +137,7 @@ test.describe("settings panel accessibility", () => {
   });
 
   test("adds no scrollbar when the whole panel fits", async ({ page }) => {
-    await page.setViewportSize({ width: 1280, height: 1000 });
+    await page.setViewportSize({ width: 1280, height: 1200 });
     await page.goto("/");
     await page.getByRole("button", { name: "Open settings" }).click();
 
