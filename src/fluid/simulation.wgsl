@@ -169,7 +169,6 @@ fn confine(@builtin(global_invocation_id) gid: vec3u) {
 
 /// Lift hot cells along `up`: heat rides in the dye's alpha channel, read on the
 /// dye grid at this cell's centre because the velocity grid is the coarser one.
-/// A shaken device's inertial force acts on every cell alike, heat or not.
 @compute @workgroup_size(WORKGROUP_SIZE, WORKGROUP_SIZE)
 fn buoyancy(@builtin(global_invocation_id) gid: vec3u) {
   let size = vec2u(u.simSize);

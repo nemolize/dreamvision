@@ -117,11 +117,16 @@ no heat glow.
 Shaking the device pushes the fluid the way a container's walls would: the
 `buoyancy` pass adds a uniform force opposite to the `devicemotion`
 `acceleration` reading (gravity excluded, rotated by the screen's orientation) to
-every cell, heat or not. The reading is used as it arrives, so the push lasts as
-long as the acceleration does, and a missing or non-finite reading is no push.
-The `Shake` setting scales it, in cells per second squared through `Scale` like
-the lift, where 1 matches a physical container shaken at that acceleration and 0
-adds no force. The pass also runs at a gravity of 0 while a push is non-zero.
+every cell, heat or not. The reading is used as it arrives, and a missing or
+non-finite reading is no push. The `Shake` setting scales the force, in cells per
+second squared through `Scale` like the lift, where 1 is the force a physical
+container shaken at that acceleration would exert and 0 adds no force. The pass
+also runs at a gravity of 0 while a push is non-zero.
+
+A uniform force on walled edges is what the pressure projection exists to remove,
+so there only part of the push survives, and how much depends on `Pressure
+sweeps` and the grid; with `Wrap edges` on, a uniform flow is divergence-free and
+the push stays whole until `Velocity decay` takes it.
 
 One deviation from a textbook solver remains: `divergence` and
 `gradientSubtract` use central differences while the Jacobi sweep solves a
@@ -138,9 +143,9 @@ the options are in
 
 ### The settings panel
 
-The gear opens twelve sliders over the running canvas. The ten solver settings
+The gear opens thirteen sliders over the running canvas. The eleven solver settings
 reach the running frame as the slider moves; the two grid resolutions wait for
-the drag to end, for the reason the next section gives. All twelve are stored, so
+the drag to end, for the reason the next section gives. All thirteen are stored, so
 the next load opens where you left it.
 
 The `Frame stats` checkbox, off by default, shows the frame rate and the GPU time

@@ -82,8 +82,8 @@ export const easeDirection = (
   return [Math.cos(angle), Math.sin(angle)];
 };
 
-/** Steps to the lift's direction scaled by `inPlaneShare`, so its length is
- * the share of `Gravity` that acts in the screen plane. */
+/** Steps the lift's direction, scaled by `inPlaneShare`; also holds the latest
+ * shake force, which is not eased. */
 export class GravityTracker {
   private target: Direction = DEFAULT_UP;
   private current: Direction = DEFAULT_UP;
