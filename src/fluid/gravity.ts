@@ -31,8 +31,8 @@ export const upFromReading = (
 
 const ZERO_FORCE: Direction = [0, 0];
 
-/** Force in m/s² opposite to the device's acceleration, gravity excluded;
- * a missing or non-finite axis is no force. */
+/** Hot dye is the lighter fluid, so a device's acceleration pushes it the same
+ * way; a missing or non-finite axis is none. */
 export const shakeFromAcceleration = (
   reading: GravityReading | null,
   angleDegrees: number,
@@ -45,7 +45,33 @@ export const shakeFromAcceleration = (
   const angle = (angleDegrees * Math.PI) / 180;
   const right = x * Math.cos(angle) - y * Math.sin(angle);
   const above = x * Math.sin(angle) + y * Math.cos(angle);
-  return [-right, above];
+  return [right, -above];
+};
+
+/** Keeps a translation out of `up`, which `shakeFromAcceleration` already counts. */
+export const withoutAcceleration = (
+  including: GravityReading | null,
+  acceleration: GravityReading | null,
+): GravityReading | null => {
+  const x = acceleration?.x;
+  const y = acceleration?.y;
+  if (including === null || typeof x !== "number" || typeof y !== "number") {
+    return including;
+  }
+  if (!Number.isFinite(x) || !Number.isFinite(y)) return including;
+  if (typeof including.x !== "number" || typeof including.y !== "number") {
+    return including;
+  }
+  const z = acceleration?.z;
+  const zWithGravity = including.z ?? null;
+  return {
+    x: including.x - x,
+    y: including.y - y,
+    z:
+      zWithGravity !== null && typeof z === "number" && Number.isFinite(z)
+        ? zWithGravity - z
+        : zWithGravity,
+  };
 };
 
 export const inPlaneShare = (reading: GravityReading | null): number | null => {

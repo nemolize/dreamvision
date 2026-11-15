@@ -591,7 +591,7 @@ describe("FluidCanvas frame loop", () => {
     expect(Math.abs(y)).toBeLessThan(0.1);
   });
 
-  it("hands the renderer a push opposite to the device's acceleration, and none before one arrives", async () => {
+  it("hands the renderer a push along the device's acceleration, and none before one arrives", async () => {
     await mount();
 
     runFrame();
@@ -608,7 +608,7 @@ describe("FluidCanvas frame loop", () => {
     const [x, y] = vi.mocked(onlyRenderer().frame).mock.calls.at(-1)?.[3] ?? [
       0, 0,
     ];
-    expect(x).toBeCloseTo(-3, 6);
+    expect(x).toBeCloseTo(3, 6);
     expect(y).toBeCloseTo(0, 6);
   });
 

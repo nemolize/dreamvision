@@ -114,19 +114,24 @@ The display pass brightens each cell's colour by `1 + glow · heat` before the
 tone-mapping curve. The `Glow` setting is that `glow` gain: 0 draws the dye with
 no heat glow.
 
-Shaking the device pushes the fluid the way a container's walls would: the
-`buoyancy` pass adds a uniform force opposite to the `devicemotion`
-`acceleration` reading (gravity excluded, rotated by the screen's orientation) to
-every cell, heat or not. The reading is used as it arrives, and a missing or
-non-finite reading is no push. The `Shake` setting scales the force, in cells per
-second squared through `Scale` like the lift, where 1 is the force a physical
-container shaken at that acceleration would exert and 0 adds no force. The pass
-also runs at a gravity of 0 while a push is non-zero.
+Shaking the device acts through the same density contrast as the lift. The
+`buoyancy` pass treats the device's acceleration `a` (the `devicemotion`
+`acceleration` reading, gravity excluded, rotated by the screen's orientation) as
+a change of the effective gravity, `g - Shake · a`, so a cell's force is
+`heat / (1 + heat) · (Gravity · up + Shake · a)`. Hot dye, the lighter fluid,
+moves the same way as the device; dye with no heat gets no force. A missing or
+non-finite reading is no push. The reading is used as it arrives, and `up` comes
+from the gravity reading with that acceleration taken out, so a translation is
+counted once. `Shake` scales `a`, in cells per second squared through `Scale`
+like the lift: 1 changes the effective gravity by exactly the device's
+acceleration, and 0 adds no force. The pass also runs at a `Gravity` of 0 while a
+push is non-zero.
 
-A uniform force on walled edges is what the pressure projection exists to remove,
-so there only part of the push survives, and how much depends on `Pressure
-sweeps` and the grid; with `Wrap edges` on, a uniform flow is divergence-free and
-the push stays whole until `Velocity decay` takes it.
+A force that is the same in every cell would be a pure pressure gradient in a
+closed container, which the projection removes; weighting it by heat leaves a
+rotational part the projection keeps, so a local blob of hot dye still moves at
+the default `Pressure sweeps`, with walls or `Wrap edges` alike. A heat layout
+whose weighted force is a pure gradient is still cancelled.
 
 One deviation from a textbook solver remains: `divergence` and
 `gradientSubtract` use central differences while the Jacobi sweep solves a

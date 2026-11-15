@@ -8,6 +8,7 @@ import {
   inPlaneShare,
   shakeFromAcceleration,
   upFromReading,
+  withoutAcceleration,
 } from "./gravity";
 
 const G = 9.8;
@@ -53,19 +54,19 @@ describe("upFromReading", () => {
 });
 
 describe("shakeFromAcceleration", () => {
-  it("pushes opposite to the device's acceleration", () => {
-    expect(shakeFromAcceleration({ x: 3, y: 0 }, 0)).toEqual(close(-3, 0));
-    expect(shakeFromAcceleration({ x: -3, y: 0 }, 0)).toEqual(close(3, 0));
+  it("points the same way as the device's acceleration", () => {
+    expect(shakeFromAcceleration({ x: 3, y: 0 }, 0)).toEqual(close(3, 0));
+    expect(shakeFromAcceleration({ x: -3, y: 0 }, 0)).toEqual(close(-3, 0));
   });
 
-  it("reads a device pushed up the screen as a force toward the bottom", () => {
-    expect(shakeFromAcceleration({ x: 0, y: 2 }, 0)).toEqual(close(0, 2));
+  it("reads a device pushed up the screen as a force toward the top", () => {
+    expect(shakeFromAcceleration({ x: 0, y: 2 }, 0)).toEqual(close(0, -2));
   });
 
   it("follows the screen rotation as the gravity reading does", () => {
     expect(upFromReading({ x: G, y: 0 }, 90)).toEqual(close(0, -1));
-    expect(shakeFromAcceleration({ x: 3, y: 0 }, 90)).toEqual(close(0, 3));
-    expect(shakeFromAcceleration({ x: 0, y: 3 }, 90)).toEqual(close(3, 0));
+    expect(shakeFromAcceleration({ x: 3, y: 0 }, 90)).toEqual(close(0, -3));
+    expect(shakeFromAcceleration({ x: 0, y: 3 }, 90)).toEqual(close(-3, 0));
   });
 
   it("is no force for a null, missing or non-finite reading", () => {
@@ -79,6 +80,46 @@ describe("shakeFromAcceleration", () => {
     ]) {
       expect(shakeFromAcceleration(reading, 0)).toEqual([0, 0]);
     }
+  });
+});
+
+describe("withoutAcceleration", () => {
+  it("takes the device's own acceleration out of the reading", () => {
+    expect(
+      withoutAcceleration({ x: 3, y: G, z: 1 }, { x: 3, y: 0, z: 1 }),
+    ).toEqual({ x: 0, y: G, z: 0 });
+  });
+
+  it("leaves a reading alone where no usable acceleration came with it", () => {
+    const including = { x: 3, y: G, z: 1 };
+    for (const acceleration of [
+      null,
+      { x: null, y: null },
+      { x: 3, y: null },
+      { x: Number.NaN, y: 1 },
+      { x: 1, y: Infinity },
+    ]) {
+      expect(withoutAcceleration(including, acceleration)).toBe(including);
+    }
+    expect(withoutAcceleration(null, { x: 3, y: 0 })).toBeNull();
+    const unusable = { x: null, y: G };
+    expect(withoutAcceleration(unusable, { x: 3, y: 0 })).toBe(unusable);
+  });
+
+  it("keeps a z the acceleration does not report", () => {
+    expect(withoutAcceleration({ x: 3, y: G, z: 1 }, { x: 3, y: 0 })).toEqual({
+      x: 0,
+      y: G,
+      z: 1,
+    });
+  });
+
+  it("counts a translation once: the lift stays upright while the shake pushes", () => {
+    const tracker = new GravityTracker();
+    tracker.update(withoutAcceleration({ x: 3, y: G }, { x: 3, y: 0 }), 0);
+    tracker.updateShake({ x: 3, y: 0 }, 0);
+    expect(tracker.step(100)).toEqual(close(0, -1));
+    expect(tracker.shake()).toEqual(close(3, 0));
   });
 });
 
@@ -164,7 +205,7 @@ describe("GravityTracker", () => {
   it("pushes at once and for as long as the acceleration lasts, then stops", () => {
     const tracker = new GravityTracker();
     tracker.updateShake({ x: 3, y: 0 }, 0);
-    expect(tracker.shake()).toEqual(close(-3, 0));
+    expect(tracker.shake()).toEqual(close(3, 0));
     tracker.updateShake({ x: 0, y: 0 }, 0);
     expect(tracker.shake()).toEqual(close(0, 0));
   });

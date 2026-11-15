@@ -97,11 +97,11 @@ describe("the devicemotion listener", () => {
     watch.dispose();
   });
 
-  it("feeds the acceleration, gravity excluded, to the tracker as a push the other way", () => {
+  it("feeds the acceleration, gravity excluded, to the tracker as a push the same way", () => {
     const { tracker, watch } = watched();
     window.dispatchEvent(motion({ x: 0, y: G }, { x: 3, y: 0 }));
     const [x, y] = tracker.shake();
-    expect(x).toBeCloseTo(-3, 6);
+    expect(x).toBeCloseTo(3, 6);
     expect(y).toBeCloseTo(0, 6);
     watch.dispose();
   });
@@ -112,7 +112,25 @@ describe("the devicemotion listener", () => {
     window.dispatchEvent(motion({ x: 0, y: G }, { x: 3, y: 0 }));
     const [x, y] = tracker.shake();
     expect(x).toBeCloseTo(0, 6);
-    expect(y).toBeCloseTo(3, 6);
+    expect(y).toBeCloseTo(-3, 6);
+    watch.dispose();
+  });
+
+  it("keeps the lift upright while a shake adds to the reading, counting it once", () => {
+    const { tracker, watch } = watched();
+    window.dispatchEvent(motion({ x: 3, y: G }, { x: 3, y: 0 }));
+    const [x, y] = tracker.step(100);
+    expect(x).toBeCloseTo(0, 6);
+    expect(y).toBeCloseTo(-1, 6);
+    watch.dispose();
+  });
+
+  it("falls back to the raw reading for the lift where no acceleration is reported", () => {
+    const { tracker, watch } = watched();
+    window.dispatchEvent(motion({ x: G, y: 0 }, null));
+    const [x, y] = tracker.step(100);
+    expect(x).toBeCloseTo(1, 6);
+    expect(y).toBeCloseTo(0, 6);
     watch.dispose();
   });
 

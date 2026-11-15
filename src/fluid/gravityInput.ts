@@ -1,4 +1,4 @@
-import type { GravityTracker } from "./gravity";
+import { type GravityTracker, withoutAcceleration } from "./gravity";
 
 export interface GravityWatch {
   /** Call from a user gesture: iOS Safari refuses the request elsewhere. */
@@ -34,7 +34,13 @@ export const watchGravity = (
 ): GravityWatch => {
   const onMotion = (event: DeviceMotionEvent): void => {
     const angle = screenAngle(win);
-    tracker.update(event.accelerationIncludingGravity, angle);
+    tracker.update(
+      withoutAcceleration(
+        event.accelerationIncludingGravity,
+        event.acceleration,
+      ),
+      angle,
+    );
     tracker.updateShake(event.acceleration, angle);
   };
   win.addEventListener("devicemotion", onMotion);
