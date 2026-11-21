@@ -258,7 +258,7 @@ regardless of what was presented.
 Deployment is handled by `.github/workflows/deploy.yml`:
 
 - Push to `main` deploys to production (`wrangler deploy`) through the `production` environment.
-- Pull requests upload a version to the separate `dreamvision-preview` Worker (`wrangler versions upload --env preview`) through the `preview` environment; that version's URL is posted as a sticky PR comment. Pull requests from forks are skipped, since GitHub does not expose the secret to them.
+- Pull requests upload a version to the separate `dreamvision-preview` Worker (`wrangler versions upload --env preview`) through the `preview` environment; that version's URL is written into the PR description. Pull requests from forks are skipped, since GitHub does not expose the secret to them.
 
 Previews live on their own Worker because any token that can upload a version to a Worker can also deploy that version. Give each environment an environment-level `CLOUDFLARE_API_TOKEN` secret scoped to its own Worker (Cloudflare **Specified Workers**, **Editor** role), and give `production` a deployment branch rule that allows only `main`. Do not keep a repository-level `CLOUDFLARE_API_TOKEN`: an environment without its own secret falls back to it.
 
