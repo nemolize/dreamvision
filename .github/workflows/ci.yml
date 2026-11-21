@@ -57,7 +57,7 @@ jobs:
       # and the reader's own error would then bury the real one.
       - if: ${{ !cancelled() && (steps.test.outcome == 'success' || steps.test.outcome == 'failure') }}
         name: Write the coverage report to the job summary
-        uses: davelosert/vitest-coverage-report-action@v2.13.1
+        uses: davelosert/vitest-coverage-report-action@v2.13.2
         with:
           comment-on: none
       - if: ${{ !cancelled() && (steps.test.outcome == 'success' || steps.test.outcome == 'failure') }}
