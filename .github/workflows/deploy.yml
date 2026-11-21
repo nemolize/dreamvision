@@ -26,10 +26,11 @@ jobs:
 
     steps:
       - if: ${{ github.event_name == 'pull_request' }}
-        name: Show wip message in sticky comment
-        uses: marocchino/sticky-pull-request-comment@v3.0.5
+        name: Show wip message in the PR description
+        uses: nemolize/actions/upsert@v1.5.0
         with:
-          message: "Version Preview URL: ⏳deployment is in progress..."
+          marker: preview-url
+          body: "Version Preview URL: ⏳deployment is in progress..."
 
       - uses: actions/checkout@v7.0.1
         with:
@@ -64,10 +65,11 @@ jobs:
           retention-days: 30
 
       - if: ${{ failure() && github.event_name == 'pull_request' }}
-        name: Show build error in sticky comment
-        uses: marocchino/sticky-pull-request-comment@v3.0.5
+        name: Show error message in the PR description
+        uses: nemolize/actions/upsert@v1.5.0
         with:
-          message: "Version Preview URL: ❌deployment failed during build."
+          marker: preview-url
+          body: "Version Preview URL: ❌deployment failed during build."
 
   Deploy:
     needs: Build
@@ -192,13 +194,15 @@ jobs:
           command: ${{ github.ref == 'refs/heads/main' && 'deploy -c ../wrangler.json --env=' || 'versions upload -c ../wrangler.json --env preview' }}
 
       - if: ${{ github.event_name == 'pull_request' }}
-        name: Show version preview URL in sticky comment
-        uses: marocchino/sticky-pull-request-comment@v3.0.5
+        name: Show preview URL in the PR description
+        uses: nemolize/actions/upsert@v1.5.0
         with:
-          message: "Version Preview URL: ${{ steps.deploy.outputs.deployment-url || '⚠️ no URL returned — is the workers.dev subdomain enabled?' }}"
+          marker: preview-url
+          body: "Version Preview URL: ${{ steps.deploy.outputs.deployment-url || '⚠️ no URL returned — is the workers.dev subdomain enabled?' }}"
 
       - if: ${{ failure() && github.event_name == 'pull_request' }}
-        name: Show error message in sticky comment
-        uses: marocchino/sticky-pull-request-comment@v3.0.5
+        name: Show error message in the PR description
+        uses: nemolize/actions/upsert@v1.5.0
         with:
-          message: "Version Preview URL: ❌deployment failed."
+          marker: preview-url
+          body: "Version Preview URL: ❌deployment failed."
