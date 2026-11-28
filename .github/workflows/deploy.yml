@@ -36,7 +36,7 @@ jobs:
         with:
           # Keeps GITHUB_TOKEN out of .git/config, where build code could read it.
           persist-credentials: false
-      - uses: nemolize/actions/setup@v1.4.1
+      - uses: nemolize/actions/setup@v1.5.0
 
       - run: pnpm run build
 
