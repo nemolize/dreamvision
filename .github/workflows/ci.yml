@@ -28,7 +28,7 @@ jobs:
         with:
           persist-credentials: false
       - id: setup
-        uses: nemolize/actions/setup@v1.4.1
+        uses: nemolize/actions/setup@v1.5.0
       - run: pnpm run lint
       - if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
         id: zizmor-version
@@ -79,7 +79,7 @@ jobs:
           } >> "$GITHUB_OUTPUT"
       - if: ${{ !cancelled() && (steps.test.outcome == 'success' || steps.test.outcome == 'failure') }}
         name: Write the coverage report into the PR description
-        uses: nemolize/actions/upsert@v1.4.1
+        uses: nemolize/actions/upsert@v1.5.0
         with:
           marker: coverage
           body: ${{ steps.table.outputs.markdown }}
@@ -106,7 +106,7 @@ jobs:
       # checkout's own safe.directory lasts only for its step; the `prepare`
       # script (`lefthook install`) that `pnpm install` runs needs it too.
       - run: git config --global --add safe.directory "$(pwd)"
-      - uses: nemolize/actions/setup@v1.4.1
+      - uses: nemolize/actions/setup@v1.5.0
       - name: Assert the image ships the Playwright version we depend on
         run: |
           img="$(node -e "process.stdout.write(JSON.parse(require('fs').readFileSync('/ms-playwright/.docker-info', 'utf8')).driverVersion)")"
